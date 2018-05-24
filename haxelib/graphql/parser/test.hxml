@@ -1,0 +1,3 @@
+-cp ../..
+-lib hxparse
+-x graphql.parser.Test
