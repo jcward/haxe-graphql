@@ -1,0 +1,16 @@
+{
+  "name": "gql2hx",
+  "version": "0.0.1",
+  "description": "Prints GraphQL IDL to Haxe types",
+  "private": true,
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^10.1.2",
+    "graphql": "^0.13.2"
+  },
+  "scripts": {
+    "build": "haxe build.hxml && cp src/index.js ./dist/",
+    "debug": "npm run build && node --nolazy --inspect-brk=13729 dist/index.js",
+    "test": "npm run build && node dist/index.js"
+  }
+}
