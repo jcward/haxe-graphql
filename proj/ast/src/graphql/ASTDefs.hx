@@ -2,122 +2,35 @@ package graphql;
 
 class ASTDefs { }
 
-// TODO: look at auto-generating these from DefinitelyTyped/types/graphql/language/ast.d.ts
-
-// But for now, fill out only the parts we're using so far:
 typedef TODO = Dynamic;
 
-typedef Document = {
-  definitions:Array<TODO>
-}
+typedef ReadonlyArray<T> = Array<T>;
 
-typedef Location = { start:Int, end:Int, ?startToken:TODO, ?endToken:TODO, ?source:TODO }
+// TODO / TBD
+typedef Document = { definitions:Array<TODO> }
+typedef TokenKindEnum = String;
+typedef Source = Dynamic;
+typedef OperationTypeNode = Dynamic;
 
+// Hmm, workaround for node type unions
 typedef BaseNode = {
-  kind:Kind,
+  kind:String,
   ?loc:Location
 }
 
-typedef BaseValueNode = { > BaseNode,
-  value:String
-}
-
-typedef WithNameAndDescription = {
-  ?description: StringValueNode,
-  ?name: NameNode,
-}
-
-typedef WithDirectives = {
-    /* readonly */ ?directives: ReadonlyArray<DirectiveNode>,
-}
-
-typedef NameNode = BaseValueNode;
-
-typedef StringValueNode = { > BaseValueNode,
-    /* readonly */ ?block:Bool
-}
-
-typedef ArgumentNode = { > BaseValueNode,
-  value:String,
-  name:String
-}
-
-typedef DirectiveNode = { > NameNode,
-  name:String,
-  ?arguments: ReadonlyArray<ArgumentNode>
-}
-
-// Type Reference
-
+// Type nodes
 typedef TypeNode = { > BaseNode,
-    // Calling these optionals makes us able to simply null-check them:
-    /* readonly */ ?name: NameNode, // Only for NamedTypeNode
-    /* readonly */ ?type: TypeNode, // Not for NamedTypeNode
-}
-
-typedef NamedTypeNode = { > TypeNode,
-    /* readonly */ name: NameNode,
-}
-
-typedef ListTypeNode = { > TypeNode,
-    /* readonly */ type: TypeNode,
+  // Calling these optionals makes us able to simply null-check them:
+  ?name: NameNode, // Only for NamedTypeNode
+  ?type: TypeNode, // Not for NamedTypeNode
 }
 
 typedef NonNullTypeNode = { > TypeNode,
     /* readonly */ type: TypeNode // NamedTypeNode | ListTypeNode,
 }
 
-typedef InputValueDefinitionNode = TODO;
-typedef FieldDefinitionNode = { > BaseNode, // kind=='FieldDefinition'
-    > WithNameAndDescription,
-    ?arguments: ReadonlyArray<InputValueDefinitionNode>,
-    type: TypeNode,
-    ?directives: ReadonlyArray<DirectiveNode>
-}
-
-// Parser use mutable:
-typedef ReadonlyArray<T> = Array<T>;
-
-// Generator use immutable:
-/*
-@:forward(length, concat, join, toString, indexOf, lastIndexOf, copy, iterator, map, filter)
-abstract ReadonlyArray<T>(Array<T>) from Array<T> to Iterable<T> {
-	@:arrayAccess @:extern inline public function arrayAccess(key:Int):T return this[key];
-}
-*/
-
-typedef ObjectTypeDefinitionNode = { > BaseNode, // kind="ObjectTypeDefinition"
-    > WithNameAndDescription,
-    > WithDirectives,
-    /* readonly */ interfaces: ReadonlyArray<NamedTypeNode>,
-    /* readonly */ fields: ReadonlyArray<FieldDefinitionNode>
-}
-
-typedef InterfaceTypeDefinitionNode = { > BaseNode, // kind="InterfaceTypeDefinition"
-    > WithNameAndDescription,
-    > WithDirectives,
-    /* readonly */ fields: ReadonlyArray<FieldDefinitionNode>
-}
-
-typedef EnumValueDefinitionNode = { > BaseNode,  // kind="EnumValueDefinition"
-    > WithNameAndDescription,
-    > WithDirectives,
-}
-
-typedef EnumTypeDefinitionNode = { > BaseNode,  // kind="EnumTypeDefinition"
-    > WithNameAndDescription,
-    > WithDirectives,
-    /* readonly */ values: ReadonlyArray<EnumValueDefinitionNode>
-}
-
-typedef UnionTypeDefinitionNode = { > BaseNode,  // kind="UnionTypeDefinition"
-    > WithNameAndDescription,
-    > WithDirectives,
-    types: ReadonlyArray<NamedTypeNode>
-}
-
-
-@:enum abstract Kind(String) {
+// Kind
+@:enum abstract Kind(String) to String from String {
   // Name
   var NAME = 'Name';
 
@@ -179,4 +92,389 @@ typedef UnionTypeDefinitionNode = { > BaseNode,  // kind="UnionTypeDefinition"
   
   // Directive Definitions
   var DIRECTIVE_DEFINITION = 'DirectiveDefinition';
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Auto-generated from DefinitelyTyped/types/graphql/language/ast.d.ts
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+typedef Location = {
+  start: Int,
+  end: Int,
+  startToken: Token,
+  endToken: Token,
+  source: Source,
+}
+
+typedef Token = {
+  kind: TokenKindEnum,
+  start: Int,
+  end: Int,
+  line: Int,
+  column: Int,
+}
+typedef ASTNode = BaseNode;
+
+// Ignored: ASTKindToNode
+
+typedef NameNode = {
+  > BaseNode,
+  kind: String, // "Name"
+  ?loc: Location,
+  value: String,
+}
+
+typedef DocumentNode = {
+  > BaseNode,
+  kind: String, // "Document"
+  ?loc: Location,
+  definitions: ReadonlyArray<DefinitionNode>,
+}
+typedef DefinitionNode = BaseNode;
+typedef ExecutableDefinitionNode = BaseNode;
+
+typedef OperationDefinitionNode = {
+  > BaseNode,
+  kind: String, // "OperationDefinition"
+  ?loc: Location,
+  operation: OperationTypeNode,
+  ?name: NameNode,
+  ?variableDefinitions: ReadonlyArray<VariableDefinitionNode>,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  selectionSet: SelectionSetNode,
+}
+
+typedef VariableDefinitionNode = {
+  > BaseNode,
+  kind: String, // "VariableDefinition"
+  ?loc: Location,
+  variable: VariableNode,
+  type: TypeNode,
+  ?defaultValue: ValueNode,
+}
+
+typedef VariableNode = {
+  > BaseNode,
+  kind: String, // "Variable"
+  ?loc: Location,
+  name: NameNode,
+}
+
+typedef SelectionSetNode = {
+  > BaseNode,
+  kind: String, // "SelectionSet"
+  ?loc: Location,
+  selections: ReadonlyArray<SelectionNode>,
+}
+typedef SelectionNode = BaseNode;
+
+typedef FieldNode = {
+  > BaseNode,
+  kind: String, // "Field"
+  ?loc: Location,
+  ?alias: NameNode,
+  name: NameNode,
+  ?arguments: ReadonlyArray<ArgumentNode>,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?selectionSet: SelectionSetNode,
+}
+
+typedef ArgumentNode = {
+  > BaseNode,
+  kind: String, // "Argument"
+  ?loc: Location,
+  name: NameNode,
+  value: ValueNode,
+}
+
+typedef FragmentSpreadNode = {
+  > BaseNode,
+  kind: String, // "FragmentSpread"
+  ?loc: Location,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+}
+
+typedef InlineFragmentNode = {
+  > BaseNode,
+  kind: String, // "InlineFragment"
+  ?loc: Location,
+  ?typeCondition: NamedTypeNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  selectionSet: SelectionSetNode,
+}
+
+typedef FragmentDefinitionNode = {
+  > BaseNode,
+  kind: String, // "FragmentDefinition"
+  ?loc: Location,
+  name: NameNode,
+  ?variableDefinitions: ReadonlyArray<VariableDefinitionNode>,
+  typeCondition: NamedTypeNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  selectionSet: SelectionSetNode,
+}
+typedef ValueNode = BaseNode;
+
+typedef IntValueNode = {
+  > BaseNode,
+  kind: String, // "IntValue"
+  ?loc: Location,
+  value: String,
+}
+
+typedef FloatValueNode = {
+  > BaseNode,
+  kind: String, // "FloatValue"
+  ?loc: Location,
+  value: String,
+}
+
+typedef StringValueNode = {
+  > BaseNode,
+  kind: String, // "StringValue"
+  ?loc: Location,
+  value: String,
+  ?block: Bool,
+}
+
+typedef BooleanValueNode = {
+  > BaseNode,
+  kind: String, // "BooleanValue"
+  ?loc: Location,
+  value: Bool,
+}
+
+typedef NullValueNode = {
+  > BaseNode,
+  kind: String, // "NullValue"
+  ?loc: Location,
+}
+
+typedef EnumValueNode = {
+  > BaseNode,
+  kind: String, // "EnumValue"
+  ?loc: Location,
+  value: String,
+}
+
+typedef ListValueNode = {
+  > BaseNode,
+  kind: String, // "ListValue"
+  ?loc: Location,
+  values: ReadonlyArray<ValueNode>,
+}
+
+typedef ObjectValueNode = {
+  > BaseNode,
+  kind: String, // "ObjectValue"
+  ?loc: Location,
+  fields: ReadonlyArray<ObjectFieldNode>,
+}
+
+typedef ObjectFieldNode = {
+  > BaseNode,
+  kind: String, // "ObjectField"
+  ?loc: Location,
+  name: NameNode,
+  value: ValueNode,
+}
+
+typedef DirectiveNode = {
+  > BaseNode,
+  kind: String, // "Directive"
+  ?loc: Location,
+  name: NameNode,
+  ?arguments: ReadonlyArray<ArgumentNode>,
+}
+
+typedef NamedTypeNode = {
+  > BaseNode,
+  kind: String, // "NamedType"
+  ?loc: Location,
+  name: NameNode,
+}
+
+typedef ListTypeNode = {
+  > BaseNode,
+  kind: String, // "ListType"
+  ?loc: Location,
+  type: TypeNode,
+}
+
+// Ignored: NonNullTypeNode
+typedef TypeSystemDefinitionNode = BaseNode;
+
+typedef SchemaDefinitionNode = {
+  > BaseNode,
+  kind: String, // "SchemaDefinition"
+  ?loc: Location,
+  directives: ReadonlyArray<DirectiveNode>,
+  operationTypes: ReadonlyArray<OperationTypeDefinitionNode>,
+}
+
+typedef OperationTypeDefinitionNode = {
+  > BaseNode,
+  kind: String, // "OperationTypeDefinition"
+  ?loc: Location,
+  operation: OperationTypeNode,
+  type: NamedTypeNode,
+}
+typedef TypeDefinitionNode = BaseNode;
+
+typedef ScalarTypeDefinitionNode = {
+  > TypeNode,
+  kind: String, // "ScalarTypeDefinition"
+  ?loc: Location,
+  ?description: StringValueNode,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+}
+
+typedef ObjectTypeDefinitionNode = {
+  > TypeNode,
+  kind: String, // "ObjectTypeDefinition"
+  ?loc: Location,
+  ?description: StringValueNode,
+  name: NameNode,
+  ?interfaces: ReadonlyArray<NamedTypeNode>,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?fields: ReadonlyArray<FieldDefinitionNode>,
+}
+
+typedef FieldDefinitionNode = {
+  > BaseNode,
+  kind: String, // "FieldDefinition"
+  ?loc: Location,
+  ?description: StringValueNode,
+  name: NameNode,
+  ?arguments: ReadonlyArray<InputValueDefinitionNode>,
+  type: TypeNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+}
+
+typedef InputValueDefinitionNode = {
+  > BaseNode,
+  kind: String, // "InputValueDefinition"
+  ?loc: Location,
+  ?description: StringValueNode,
+  name: NameNode,
+  type: TypeNode,
+  ?defaultValue: ValueNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+}
+
+typedef InterfaceTypeDefinitionNode = {
+  > TypeNode,
+  kind: String, // "InterfaceTypeDefinition"
+  ?loc: Location,
+  ?description: StringValueNode,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?fields: ReadonlyArray<FieldDefinitionNode>,
+}
+
+typedef UnionTypeDefinitionNode = {
+  > TypeNode,
+  kind: String, // "UnionTypeDefinition"
+  ?loc: Location,
+  ?description: StringValueNode,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?types: ReadonlyArray<NamedTypeNode>,
+}
+
+typedef EnumTypeDefinitionNode = {
+  > TypeNode,
+  kind: String, // "EnumTypeDefinition"
+  ?loc: Location,
+  ?description: StringValueNode,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?values: ReadonlyArray<EnumValueDefinitionNode>,
+}
+
+typedef EnumValueDefinitionNode = {
+  > BaseNode,
+  kind: String, // "EnumValueDefinition"
+  ?loc: Location,
+  ?description: StringValueNode,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+}
+
+typedef InputObjectTypeDefinitionNode = {
+  > TypeNode,
+  kind: String, // "InputObjectTypeDefinition"
+  ?loc: Location,
+  ?description: StringValueNode,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?fields: ReadonlyArray<InputValueDefinitionNode>,
+}
+typedef TypeExtensionNode = BaseNode;
+
+typedef ScalarTypeExtensionNode = {
+  > BaseNode,
+  kind: String, // "ScalarTypeExtension"
+  ?loc: Location,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+}
+
+typedef ObjectTypeExtensionNode = {
+  > BaseNode,
+  kind: String, // "ObjectTypeExtension"
+  ?loc: Location,
+  name: NameNode,
+  ?interfaces: ReadonlyArray<NamedTypeNode>,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?fields: ReadonlyArray<FieldDefinitionNode>,
+}
+
+typedef InterfaceTypeExtensionNode = {
+  > BaseNode,
+  kind: String, // "InterfaceTypeExtension"
+  ?loc: Location,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?fields: ReadonlyArray<FieldDefinitionNode>,
+}
+
+typedef UnionTypeExtensionNode = {
+  > BaseNode,
+  kind: String, // "UnionTypeExtension"
+  ?loc: Location,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?types: ReadonlyArray<NamedTypeNode>,
+}
+
+typedef EnumTypeExtensionNode = {
+  > BaseNode,
+  kind: String, // "EnumTypeExtension"
+  ?loc: Location,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?values: ReadonlyArray<EnumValueDefinitionNode>,
+}
+
+typedef InputObjectTypeExtensionNode = {
+  > BaseNode,
+  kind: String, // "InputObjectTypeExtension"
+  ?loc: Location,
+  name: NameNode,
+  ?directives: ReadonlyArray<DirectiveNode>,
+  ?fields: ReadonlyArray<InputValueDefinitionNode>,
+}
+
+typedef DirectiveDefinitionNode = {
+  > BaseNode,
+  kind: String, // "DirectiveDefinition"
+  ?loc: Location,
+  ?description: StringValueNode,
+  name: NameNode,
+  ?arguments: ReadonlyArray<InputValueDefinitionNode>,
+  locations: ReadonlyArray<NameNode>,
 }

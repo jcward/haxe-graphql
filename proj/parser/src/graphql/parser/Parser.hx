@@ -85,7 +85,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
                                       is_interface:Bool=false,
                                       is_schema:Bool=false):Outcome<BaseNode, Err> {
     var def = {
-      loc: { start:start, end:start, source:_source },
+      loc: { start:start, end:start, source:_source, startToken:null, endToken:null  },
       kind: Kind.OBJECT_TYPE_DEFINITION,
       name:null,
       fields:[]
@@ -143,7 +143,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   private function readEnumDefinition(start:Int):Outcome<BaseNode, Err>
   {
     var def:EnumTypeDefinitionNode = {
-      loc: { start:start, end:pos, source:_source },
+      loc: { start:start, end:pos, source:_source, startToken:null, endToken:null },
       kind:Kind.ENUM_TYPE_DEFINITION,
       name:null,
       values:[]
@@ -173,7 +173,7 @@ trace('Read ev ${ i.sure() }');
   private function readUnionDefinition(start:Int):Outcome<BaseNode, Err>
   {
     var def:UnionTypeDefinitionNode = {
-      loc: { start:start, end:pos, source:_source },
+      loc: { start:start, end:pos, source:_source, startToken:null, endToken:null },
       kind:Kind.UNION_TYPE_DEFINITION,
       name:null,
       types:[]
@@ -202,7 +202,7 @@ trace('Read ev ${ i.sure() }');
   {
     skipWhitespace(true);
     var def:FieldDefinitionNode = {
-      loc: { start:pos, end:pos, source:_source },
+      loc: { start:pos, end:pos, source:_source, startToken:null, endToken:null },
       kind:Kind.OBJECT_TYPE_DEFINITION,
       name:null,
       type:null,
@@ -234,18 +234,18 @@ trace('Read ev ${ i.sure() }');
     // Wrap the NamedTypeNode in List and/or NonNull wrappers
     var t:TypeNode = def;
     if (outer_not_null) {
-      t.type = ({ type:null, kind:Kind.NON_NULL_TYPE }:NonNullTypeNode);
+      t.type = cast { type:null, kind:Kind.NON_NULL_TYPE };
       t = t.type;
     }
     if (list_wrap) {
-      t.type = ({ type:null, kind:Kind.LIST_TYPE }:ListTypeNode);
+      t.type = cast { type:null, kind:Kind.LIST_TYPE };
       t = t.type;
     }
     if (inner_not_null) {
-      t.type = ({ type:null, kind:Kind.NON_NULL_TYPE }:NonNullTypeNode);
+      t.type = cast { type:null, kind:Kind.NON_NULL_TYPE };
       t = t.type;
     }
-    t.type = named_type;
+    t.type = cast named_type;
     def.loc.end = pos;
     skipWhitespace(true);
     return Success(def);
