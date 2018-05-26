@@ -179,7 +179,8 @@ class HaxeGenerator
     return rtn;
   }
   
-  /* Ensure type0 strictly equals type1, including optionality */
+  /* -- TODO: REVIEW: http://facebook.github.io/graphql/October2016/#sec-Object-type-validation
+                      sub-typing seems to be allowed... */
   function type0_equal_to_type1(type0:TypeStringifier, type1:TypeStringifier):Bool
   {
     // trace('STC: '+type0.toString(true)+' == '+type1.toString(true));

@@ -11,7 +11,7 @@ typedef Document = {
   definitions:Array<TODO>
 }
 
-typedef Location = { start:Int, end:Int, startToken:TODO, endToken:TODO, source:TODO }
+typedef Location = { start:Int, end:Int, ?startToken:TODO, ?endToken:TODO, ?source:TODO }
 
 typedef BaseNode = {
   kind:Kind,
@@ -31,7 +31,7 @@ typedef WithDirectives = {
     /* readonly */ ?directives: ReadonlyArray<DirectiveNode>,
 }
 
-typedef NameNode = { > BaseValueNode, }
+typedef NameNode = BaseValueNode;
 
 typedef StringValueNode = { > BaseValueNode,
     /* readonly */ ?block:Bool
@@ -75,10 +75,16 @@ typedef FieldDefinitionNode = { > BaseNode, // kind=='FieldDefinition'
     ?directives: ReadonlyArray<DirectiveNode>
 }
 
+// Parser use mutable:
+typedef ReadonlyArray<T> = Array<T>;
+
+// Generator use immutable:
+/*
 @:forward(length, concat, join, toString, indexOf, lastIndexOf, copy, iterator, map, filter)
 abstract ReadonlyArray<T>(Array<T>) from Array<T> to Iterable<T> {
 	@:arrayAccess @:extern inline public function arrayAccess(key:Int):T return this[key];
 }
+*/
 
 typedef ObjectTypeDefinitionNode = { > BaseNode, // kind="ObjectTypeDefinition"
     > WithNameAndDescription,
