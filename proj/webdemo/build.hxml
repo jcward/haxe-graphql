@@ -1,0 +1,15 @@
+# Parser
+../../proj/parser/depends.hxml
+-cp ../../proj/parser/src
+
+# Generator
+-cp ../../proj/hxgen/src
+
+# AST / Utils
+-cp ../../proj/ast/src
+-cp ../../proj/utils/src
+
+# Web demo
+-main Demo
+-dce full
+-js gql2hx_demo.js

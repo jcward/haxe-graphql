@@ -1,0 +1,220 @@
+<!DOCTYPE>
+<html>
+<head>
+  <title>GraphQL + Haxe Demo</title>
+  <style>
+   body { background-color: #f5f3f3; padding:10px; margin:0; font-family: Arial }
+   .cont {
+     position: relative;
+     display:inline-block;
+     width: 33%;
+     height:calc(100% - 40px);
+     padding: 10px;
+     box-sizing: border-box;
+     vertical-align:top;
+   }
+   .cont > * {
+     position:relative;
+     display:block;
+     width:100%;
+     height:100%;
+   }
+   .cont textarea {
+     overflow:auto;
+     resize: none;
+     background-color:#f3f3f3;
+     color:#445;
+     padding:5px;
+   }
+   div.cont pre {
+     overflow:auto;
+     margin:0;
+     box-sizing:border-box;
+     border: 1px solid #eee;
+   }
+   .err-loc {
+     position:absolute;
+     display:none;
+     top:0;left:0;
+     width:10px; height:20px;
+     background-color:rgba(255,0,0,0.3);
+     pointer-events:none;
+     z-index:2;
+   }
+   .labels { white-space:nowrap; }
+   .labels span {
+     display: inline-block;
+     width: 33%;
+     font-size: 26px;
+     font-weight: bold;
+     color: #8e0a0a;
+     padding-left: 10px;
+     box-sizing: border-box;
+     white-space:nowrap;
+     overflow:hidden;
+   }
+   .labels a { color: #8e0a0a; transition: color 0.15s linear; }
+   .labels a:hover { color: #4896dc }
+   .github-link { position:fixed; width:80px; height:80px; top:0; right:0; z-index:2; }
+   .github-link span {
+     display: inline-block;
+     position: relative;
+     transform: rotate(45deg) translate(-1px, 19px);
+     padding: 5px 35px;
+     color: #fff;
+     background-color: #a00;
+     font-weight: bold;
+     text-shadow: 0 0 3px #500;
+     letter-spacing: 0.5px;
+     font-family: sans-serif;
+     border: 2px solid #fff;
+     outline: 1px solid #a00;
+   }
+
+   @media (max-width: 1024px) {
+     .labels span { width:50%; }
+     .labels span:nth-child(2) { display:none; }
+     .cont { width: 50%; }
+     .cont.parse { display:none; }
+   }
+
+  </style>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/agate.min.css" rel="stylesheet"/>
+</head>
+<body>
+  <a class="github-link" href="https://github.com/jcward/haxe-graphql"><span>Github</span></a>
+  <div class="labels">
+    <span>Enter GraphQL here</span>
+    <span>gql2ast / Parser.hx</span>
+    <span>gql2hx / HaxeGenerator.hx</span>
+  </div>
+  <div class="cont"><div class="err-loc"></div>
+  <textarea autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">enum Greetings {
+  Hello
+  Hi
+  Salutations
+}
+
+interface NameAndAge {
+  name : String!
+  age  : Int!
+}
+
+interface Speech {
+  languages: [Language]!
+}
+
+# A comment
+type Person implements NameAndAge & Speech {
+  id:    ID!
+  name : String!
+  age   :Int!
+  friends: [Person!]
+}
+
+type Dog implements NameAndAge {
+  id:    ID!
+  name : String!
+  age   :Int!
+}
+
+union Alive = Person | Dog
+
+enum Language {
+  English
+  Spanish
+  French
+  # etc
+}
+
+</textarea></div><div class="cont parse">
+  <pre class="agate json"><code></code></pre>
+</div><div class="cont gen">
+  <pre class="agate haxe"><code></code></pre>
+</div>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haxe.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/json.min.js"></script>
+<script src="gql2hx_demo.js"></script>
+<script>
+$("textarea").bind('input propertychange',update);
+
+$("textarea").bind('keydown', function(e) {
+  // https://stackoverflow.com/questions/6637341/use-tab-to-indent-in-textarea
+  var keyCode = e.keyCode || e.which;
+
+  if (keyCode == 9) {
+    e.preventDefault();
+    var start = this.selectionStart;
+    var end = this.selectionEnd;
+
+    // set textarea value to: text before caret + tab + text after caret
+    $(this).val($(this).val().substring(0, start)
+                + "  "
+                + $(this).val().substring(end));
+
+    // put caret at right position again
+    this.selectionStart =
+    this.selectionEnd = start + 2;
+    update();
+  }
+});
+
+function update() {
+  var code_pre = $(".cont.gen pre")[0];
+  var json_pre = $(".cont.parse pre")[0];
+  var graphql = $("textarea").val();
+
+  $(".cont.parse pre code")[0].innerText = '{}';
+  $(".cont.gen pre code")[0].innerText = '// Haxe code';
+
+  $('.err-loc').css('display','none');
+
+  var doc = {}
+  json_pre.className = 'agate json';
+  try {
+    var doc = window.Demo.parse(graphql);
+    $(json_pre).find('code').text(JSON.stringify(doc, null, '  '));
+    hljs.highlightBlock(json_pre);
+  } catch (e) {
+    // Parse error
+    var msg = ''+e;
+    if (window.innerWidth>1024) {
+      $(json_pre).find('code').text(msg);
+      $(code_pre).find('code').text('// Parse error, cannot generate code');
+    } else {
+      $(json_pre).find('code').text();
+      $(code_pre).find('code').text(msg+'\n\n// Parse error, cannot generate code');
+    }
+    var m = msg.match(/(\d+): characters (\d+)/);
+    if (m) {
+      // Error loc hack: pixels per character :P
+      var width_per_char = 8.0;
+      var height_per_char = 15;
+      $('.err-loc').css('display','block');
+      $('.err-loc').css('top',14+height_per_char*(m[1]-1)).css('left',15+width_per_char*(m[2]-1))
+    }
+    return;
+  }
+  
+  var result = { stderr:'', stdout:'' };
+  try {
+    result = window.Demo.hxgen(doc);
+  } catch (e) {
+    result = { stderr:''+e };
+  }
+
+  if (result.stderr.length>0) {
+    code_pre.className = 'agate bash';
+    $(code_pre).find('code').text(result.stderr);
+  } else {
+    code_pre.className = 'agate haxe';
+    $(code_pre).find('code').text(result.stdout);
+  }
+  hljs.highlightBlock(code_pre);
+}
+update();
+</script>
+</html>

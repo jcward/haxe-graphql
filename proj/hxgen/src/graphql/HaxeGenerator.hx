@@ -242,6 +242,7 @@ class HaxeGenerator
     _stdout_writer.append('enum '+def.name.value+' { // Union');
     for (type in def.types) {
       if (type.name==null) throw 'Expecting Named Type';
+      type_referenced(def.name.value);
       _stdout_writer.append('  is_'+type.name.value+'(value:'+type.name.value+');');
     }
     _stdout_writer.append('}');
@@ -252,7 +253,7 @@ class HaxeGenerator
   function init_base_types() {
     // ID
     _stdout_writer.append('/* - - - - Haxe / GraphQL compatibility types - - - - */');
-    _stdout_writer.append('abstract IDString(String) to String { // Strict safety -- require explicit fromString');
+    _stdout_writer.append('abstract IDString(String) to String {\n  // Strict safety -- require explicit fromString');
     _stdout_writer.append('  public static inline function fromString(s:String) return cast s;');
     _stdout_writer.append('  public static inline function ofString(s:String) return cast s;');
     _stdout_writer.append('}');
@@ -267,7 +268,7 @@ class HaxeGenerator
     // Aliases for Haxe
     _stdout_writer.append('typedef Boolean = Bool;');
     type_defined('Boolean');
-    _stdout_writer.append('/* - - - - - - - - - - - - - - - - - - - - - - - - - */');
+    _stdout_writer.append('/* - - - - - - - - - - - - - - - - - - - - - - - - - */\n\n');
   }
 
 }

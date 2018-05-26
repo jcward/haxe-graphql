@@ -23,26 +23,30 @@ class Err {
 class Parser extends tink.parse.ParserBase<Pos, Err>
 {
   public var document(default,null):Document;
-  private var _source:String;
+  private var _filename:String;
 
-  public function new(schema:String, source:String='Untitled')
+  public function new(schema:String, filename:String='Untitled')
   {
     super(schema);
-    _source = source;
+    _filename = filename;
     try {
       document = readDocument();
     } catch (e:Err) {
-      var line_num = 1;
-      var off = 0;
-      for (i in 0...e.pos.min) {
-        if (this.source.fastGet(i)=="\n".code) {
-          off = i;
-          line_num++;
-        }
-      }
-      trace('$source:$line_num: characters ${ e.pos.min-off }-${ e.pos.max-off } Error: ${ e.message }');
-      throw 'Parser error';
+      format_and_rethrow(_filename, this.source, e);
     }
+  }
+
+  static function format_and_rethrow(filename:String, source:tink.parse.StringSlice, e:Err)
+  {
+    var line_num = 1;
+    var off = 0;
+    for (i in 0...e.pos.min) if (source.fastGet(i)=="\n".code) {
+      off = i;
+      line_num++;
+    }
+    // Line number error message
+    var msg = '$filename:$line_num: characters ${ e.pos.min-off }-${ e.pos.max-off } Error: ${ e.message }';
+    throw msg;
   }
 
   static var COMMENT_CHAR = '#'.code;
@@ -85,7 +89,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
                                       is_interface:Bool=false,
                                       is_schema:Bool=false):Outcome<BaseNode, Err> {
     var def = {
-      loc: { start:start, end:start, source:_source, startToken:null, endToken:null  },
+      loc: { start:start, end:start, source:_filename, startToken:null, endToken:null  },
       kind: Kind.OBJECT_TYPE_DEFINITION,
       name:null,
       fields:[]
@@ -143,7 +147,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   private function readEnumDefinition(start:Int):Outcome<BaseNode, Err>
   {
     var def:EnumTypeDefinitionNode = {
-      loc: { start:start, end:pos, source:_source, startToken:null, endToken:null },
+      loc: { start:start, end:pos, source:_filename, startToken:null, endToken:null },
       kind:Kind.ENUM_TYPE_DEFINITION,
       name:null,
       values:[]
@@ -158,7 +162,6 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       skipWhitespace(true);
       var i = ident();
       if (!i.isSuccess()) return Failure(i.getParameters()[0]);
-trace('Read ev ${ i.sure() }');
       var ev:EnumValueDefinitionNode = { kind:Kind.NAMED_TYPE, name:mkNameNode(i.sure()) };
       def.values.push(ev);
       skipWhitespace(true);
@@ -173,7 +176,7 @@ trace('Read ev ${ i.sure() }');
   private function readUnionDefinition(start:Int):Outcome<BaseNode, Err>
   {
     var def:UnionTypeDefinitionNode = {
-      loc: { start:start, end:pos, source:_source, startToken:null, endToken:null },
+      loc: { start:start, end:pos, source:_filename, startToken:null, endToken:null },
       kind:Kind.UNION_TYPE_DEFINITION,
       name:null,
       types:[]
@@ -202,7 +205,7 @@ trace('Read ev ${ i.sure() }');
   {
     skipWhitespace(true);
     var def:FieldDefinitionNode = {
-      loc: { start:pos, end:pos, source:_source, startToken:null, endToken:null },
+      loc: { start:pos, end:pos, source:_filename, startToken:null, endToken:null },
       kind:Kind.OBJECT_TYPE_DEFINITION,
       name:null,
       type:null,
