@@ -1,4 +1,9 @@
--cp src
--cp utils
--main graphql.HaxeGenerator
+graphql.HaxeGenerator
 -js dist/hxgen.js
+
+# Generator
+-cp ../hxgen/src
+
+# AST / Utils
+-cp ../ast/src
+-cp ../utils/src
