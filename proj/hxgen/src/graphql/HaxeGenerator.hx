@@ -31,7 +31,7 @@ class HaxeGenerator
     var gen = new HaxeGenerator(options);
 
     // Check for options / init errors
-    if (gen._stderr_writer.is_empty()) {
+    if (!gen._stderr_writer.is_empty()) {
       return { stdout:'', stderr:gen._stderr_writer.toString() };
     }
 
