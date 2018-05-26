@@ -1,0 +1,27 @@
+
+interface IName {
+	name: String!
+}
+
+type Brain {
+  iq: Int
+}
+
+interface IBeing {
+	name: String!
+	brain: Brain
+}
+
+interface INamedOwner {
+	owner: IName
+}
+
+# Type definitions don't unify, they must strictly match...
+
+# So this should fail with:
+# Type ABeingsHome defines owner:Null<IBeing>, but Interface INamedOwner requires owner:INamedOwner
+
+type ABeingsHome implements INamedOwner {
+  owner: IBeing
+}
+
