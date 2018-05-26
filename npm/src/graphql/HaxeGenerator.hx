@@ -197,7 +197,7 @@ class HaxeGenerator
     var optional_as_null = true;
     var short_format = true;
   
-    trace('Generating typedef: '+def.name.value);
+    // trace('Generating typedef: '+def.name.value);
     _writer.append('typedef '+def.name.value+' = {');
   
     var interface_fields_from = new ArrayStringMap<String>();
@@ -274,7 +274,7 @@ class HaxeGenerator
   }
   
   function write_haxe_enum(def:ASTDefs.EnumTypeDefinitionNode) {
-    trace('Generating enum: '+def.name.value);
+    // trace('Generating enum: '+def.name.value);
     type_defined(def.name.value);
     _writer.append('enum '+def.name.value+' {');
     for (enum_value in def.values) {
@@ -284,7 +284,7 @@ class HaxeGenerator
   }
   
   function write_union_as_haxe_enum(def:ASTDefs.UnionTypeDefinitionNode) {
-    trace('Generating union (enum): '+def.name.value);
+    // trace('Generating union (enum): '+def.name.value);
     type_defined(def.name.value);
     _writer.append('enum '+def.name.value+' { // Union');
     for (type in def.types) {

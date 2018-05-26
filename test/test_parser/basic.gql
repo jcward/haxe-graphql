@@ -1,0 +1,31 @@
+
+enum Greetings {
+  Hello
+  Hi
+  Salutations
+}
+
+interface INamed {
+  name : String!
+}
+
+interface IAged {
+  age:Int
+}
+
+# A basic person type:
+type Person implements INamed & IAged { # Some comment
+  id:    ID!
+  name : String!
+  age   :Int
+  friends: [Person!]
+}
+
+ # type NotToBeParsed {
+ type Dog implements INamed & IAged {
+  id:    ID!
+  name : String!
+  age   :Int
+}
+
+union Alive = Person | Dog

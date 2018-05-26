@@ -25,11 +25,24 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   public var document(default,null):Document;
   private var _source:String;
 
-  public function new(schema:String, ?source:String)
+  public function new(schema:String, source:String='Untitled')
   {
     super(schema);
     _source = source;
-    document = readDocument();
+    try {
+      document = readDocument();
+    } catch (e:Err) {
+      var line_num = 1;
+      var off = 0;
+      for (i in 0...e.pos.min) {
+        if (this.source.fastGet(i)=="\n".code) {
+          off = i;
+          line_num++;
+        }
+      }
+      trace('$source:$line_num: characters ${ e.pos.min-off }-${ e.pos.max-off } Error: ${ e.message }');
+      throw 'Parser error';
+    }
   }
 
   static var COMMENT_CHAR = '#'.code;
@@ -44,7 +57,6 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
 
       switch readDefinition() {
         case Success(d):
-          trace('success, read def $d!');
           defs.push(d);
         case Failure(f):
           throw makeError(f.message, makePos(pos));
@@ -53,53 +65,140 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return { definitions:defs };
   }
 
-  function readDefinition():Outcome<BaseNode, Err>
+  private function readDefinition():Outcome<BaseNode, Err>
   {
     skipWhitespace(true);
     var p = pos;
     var rtn:Outcome<BaseNode, Err> = switch ident(true) {
       case Success(v) if (v=="type"): readTypeDefinition(p);
-      case Success(v) if (v=="enum"): Success(readEnumDefinition(p));
-      case Success(_): Failure(makeError('Got "${ source[p...pos] }", expecting keyword: type enum schema union interface', makePos(p)));
+      case Success(v) if (v=="interface"): readTypeDefinition(p, true);
+      case Success(v) if (v=="schema"): readTypeDefinition(p, false, true);
+      case Success(v) if (v=="enum"): readEnumDefinition(p);
+      case Success(v) if (v=="union"): readUnionDefinition(p);
+      case Success(_): Failure(makeError('Got "${ source[p...pos] }", expecting keyword: type interface enum schema union', makePos(p)));
       case Failure(e): Failure(e);
     }
     return rtn;
   }
 
-  function readTypeDefinition(start:Int):Outcome<BaseNode, Err> {
-    var def:ObjectTypeDefinitionNode = {
+  private function readTypeDefinition(start:Int,
+                                      is_interface:Bool=false,
+                                      is_schema:Bool=false):Outcome<BaseNode, Err> {
+    var def = {
       loc: { start:start, end:start, source:_source },
-      kind:Kind.OBJECT_TYPE_DEFINITION,
+      kind: Kind.OBJECT_TYPE_DEFINITION,
       name:null,
-      interfaces:[],
       fields:[]
+    };
+    if (is_interface) def.kind = Kind.INTERFACE_TYPE_DEFINITION;
+    if (is_schema) def.kind = Kind.SCHEMA_DEFINITION;
+    var interfaces = [];
+    skipWhitespace(true);
+    if (!is_schema) {
+      var name:String = ident().sure();
+      def.name = mkNameNode(name);
+      skipWhitespace(true);
+    }
+
+    var err:Outcome<BaseNode, Err> = null;
+    if (allow('implements')) {
+      if (is_interface) return fail('Interfaces cannot implement interfaces.');
+      parseRepeatedly(function() {
+        var i = ident();
+        if (!i.isSuccess()) { err = Failure(i.getParameters()[0]); return; }
+        var if_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:mkNameNode(i.sure()) };
+        interfaces.push(if_type);
+      }, {end:'{', sep:'&', allowTrailing:false});
+    } else {
+      expect('{');
+    }
+    if (err!=null) return err;
+
+    while (true) {
+      switch readFieldDefinition() {
+        case Success(field): def.fields.push(field);
+        case Failure(e): return Failure(e);
+      }
+      if (allow('}')) break;
+    }
+    def.loc.end = pos;
+
+    skipWhitespace(true);
+
+    if (is_interface) {
+      var inode:InterfaceTypeDefinitionNode = def;
+      return Success(inode);
+    } else if (is_schema) {
+      // TODO: var snode:SchemaDefinitionNode = def;
+      throw 'SchemaDefinitionNode is not yet supported...';
+    } else {
+      var onode:ObjectTypeDefinitionNode = {
+        name:def.name, loc:def.loc, kind:def.kind, fields:def.fields, interfaces:interfaces
+      };
+      return Success(onode);
+    }
+  }
+  function mkNameNode(name:String) return { kind:Kind.NAMED_TYPE, value:name, loc:null };
+
+  private function readEnumDefinition(start:Int):Outcome<BaseNode, Err>
+  {
+    var def:EnumTypeDefinitionNode = {
+      loc: { start:start, end:pos, source:_source },
+      kind:Kind.ENUM_TYPE_DEFINITION,
+      name:null,
+      values:[]
     };
     skipWhitespace(true);
     var name:String = ident().sure();
     def.name = mkNameNode(name);
     skipWhitespace(true);
 
-    // TODO: parse: implements IF1 & IF2
-
-    if (!is('{'.code)) return Failure(makeError('Got "${ source[pos...pos+1] }", expecting "{"', makePos(pos)));
-    
+    expect('{');
     while (true) {
-      switch readFieldDefinition() {
-        case Success(field): def.fields.push(field);
-        case Failure(e): return Failure(e);
-      }
+      skipWhitespace(true);
+      var i = ident();
+      if (!i.isSuccess()) return Failure(i.getParameters()[0]);
+trace('Read ev ${ i.sure() }');
+      var ev:EnumValueDefinitionNode = { kind:Kind.NAMED_TYPE, name:mkNameNode(i.sure()) };
+      def.values.push(ev);
+      skipWhitespace(true);
+      if (allow('}')) break;
     }
-    if (!is('}'.code)) return Failure(makeError('Got "${ source[pos...pos+1] }", expecting "}"', makePos(pos)));
     def.loc.end = pos;
 
     skipWhitespace(true);
-
     return Success(def);
   }
-  function mkNameNode(name:String) return { kind:Kind.NAMED_TYPE, value:name, loc:null };
-  function readEnumDefinition(start:Int):BaseNode return null;
 
-  function readFieldDefinition()
+  private function readUnionDefinition(start:Int):Outcome<BaseNode, Err>
+  {
+    var def:UnionTypeDefinitionNode = {
+      loc: { start:start, end:pos, source:_source },
+      kind:Kind.UNION_TYPE_DEFINITION,
+      name:null,
+      types:[]
+    };
+    skipWhitespace(true);
+    var name:String = ident().sure();
+    def.name = mkNameNode(name);
+    skipWhitespace(true);
+
+    expect('=');
+    while (true) {
+      skipWhitespace(true);
+      var i = ident();
+      if (!i.isSuccess()) return Failure(i.getParameters()[0]);
+      var u_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:mkNameNode(i.sure()) };
+      def.types.push(u_type);
+      if (!allow('|')) break;
+    }
+    def.loc.end = pos;
+
+    skipWhitespace(true);
+    return Success(def);
+  }
+
+  private function readFieldDefinition()
   {
     skipWhitespace(true);
     var def:FieldDefinitionNode = {
@@ -114,22 +213,23 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     var list_wrap = false;
     var inner_not_null = false;
     var outer_not_null = false;
-    def.name = mkNameNode(ident().sure());
-    skipWhitespace();
+    var name:String = ident().sure();
+    def.name = mkNameNode(name);
     //TODO: ( ... queries ? )
-    if (!is(':'.code)) return fail('Got "${ source[pos...pos+1] }", expecting "}"');
+    expect(':');
+    if (allow('[')) list_wrap = true;
     skipWhitespace();
-    if (is('['.code)) list_wrap = true;
-    skipWhitespace();
-    var named_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:mkNameNode(ident().sure()) }
+    var i = ident();
+    if (!i.isSuccess()) { return Failure(i.getParameters()[0]); }
+    var named_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:mkNameNode(i.sure()) }
     skipWhitespace();
     if (list_wrap) {
-      if (is('!'.code)) inner_not_null = true;
+      if (allow('!')) inner_not_null = true;
       skipWhitespace();
       expect(']');
     }
     skipWhitespace();
-    if (is('!'.code)) outer_not_null = true;
+    if (allow('!')) outer_not_null = true;
 
     // Wrap the NamedTypeNode in List and/or NonNull wrappers
     var t:TypeNode = def;

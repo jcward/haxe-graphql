@@ -89,8 +89,14 @@ abstract ReadonlyArray<T>(Array<T>) from Array<T> to Iterable<T> {
 typedef ObjectTypeDefinitionNode = { > BaseNode, // kind="ObjectTypeDefinition"
     > WithNameAndDescription,
     > WithDirectives,
-    /* readonly */ ?interfaces: ReadonlyArray<NamedTypeNode>,
-    /* readonly */ ?fields: ReadonlyArray<FieldDefinitionNode>
+    /* readonly */ interfaces: ReadonlyArray<NamedTypeNode>,
+    /* readonly */ fields: ReadonlyArray<FieldDefinitionNode>
+}
+
+typedef InterfaceTypeDefinitionNode = { > BaseNode, // kind="InterfaceTypeDefinition"
+    > WithNameAndDescription,
+    > WithDirectives,
+    /* readonly */ fields: ReadonlyArray<FieldDefinitionNode>
 }
 
 typedef EnumValueDefinitionNode = { > BaseNode,  // kind="EnumValueDefinition"
@@ -101,13 +107,13 @@ typedef EnumValueDefinitionNode = { > BaseNode,  // kind="EnumValueDefinition"
 typedef EnumTypeDefinitionNode = { > BaseNode,  // kind="EnumTypeDefinition"
     > WithNameAndDescription,
     > WithDirectives,
-    /* readonly */ ?values: ReadonlyArray<EnumValueDefinitionNode>
+    /* readonly */ values: ReadonlyArray<EnumValueDefinitionNode>
 }
 
 typedef UnionTypeDefinitionNode = { > BaseNode,  // kind="UnionTypeDefinition"
     > WithNameAndDescription,
     > WithDirectives,
-    ?types: ReadonlyArray<NamedTypeNode>
+    types: ReadonlyArray<NamedTypeNode>
 }
 
 

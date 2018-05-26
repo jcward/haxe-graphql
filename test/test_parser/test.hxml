@@ -1,0 +1,7 @@
+-lib tink_parse
+-cp .
+-cp ../../haxelib
+-debug
+-cp ../../npm/src/
+-cp ../../npm/utils/
+-x Test
