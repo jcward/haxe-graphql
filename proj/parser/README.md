@@ -14,3 +14,5 @@ interesting and flexible use cases:
   - Technically you could call out to npm or a web api, but that'd be slow.
 - A live, browser-based GQL to Haxe code.
   - Although, perhaps the graphql module compiles to browser-friendly js?
+
+Hence, I built this one on top of [tink_parse](https://github.com/haxetink/tink_parse).

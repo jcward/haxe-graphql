@@ -12,4 +12,10 @@
 # Web demo
 -main Demo
 -dce full
--js gql2hx_demo.js
+-js out.js
+
+--next
+-cmd cat out.js | uglifyjs -m > gql2hx_demo.js
+
+--next
+-cmd rm out.js
