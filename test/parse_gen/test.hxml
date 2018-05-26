@@ -1,9 +1,15 @@
--lib tink_parse
--lib tink_core
+# Parser
+../../proj/parser/depends.hxml
+-cp ../../proj/parser/src
+
+# Generator
+-cp ../../proj/hxgen/src
+
+# AST / Utils
+-cp ../../proj/ast/src
+-cp ../../proj/utils/src
+
+# Test
 -debug
 -cp .
--cp ../../proj/parser/src
--cp ../../proj/ast/src
--cp ../../proj/hxgen/src
--cp ../../proj/utils/src
 -x Test
