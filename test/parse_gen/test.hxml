@@ -1,0 +1,8 @@
+-lib tink_parse
+-debug
+-cp .
+-cp ../../parser/src
+-cp ../../ast/src
+-cp ../../hxgen/src
+-cp ../../utils/src
+-x Test

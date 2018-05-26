@@ -18,6 +18,6 @@ class Test
     trace(source);
 
     trace('Generating Haxe:');
-    trace(graphql.HaxeGenerator.parse_graphql_doc(p.document));
+    trace(graphql.HaxeGenerator.parse(p.document));
   }
 }
