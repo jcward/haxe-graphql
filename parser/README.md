@@ -1,7 +1,7 @@
 Parsing GraphQL to GQL AST
 ---------
 
-Hmm, this is an interesting problem. Using the npm (graphql)[https://www.npmjs.com/package/graphql] module will be
+Hmm, this is an interesting problem. Using the [npm graphql module](https://www.npmjs.com/package/graphql) will be
 most accurate, and least effort.
 
 The gql2hx npm module (a cli tool) uses the graphql module for parsing, and then
