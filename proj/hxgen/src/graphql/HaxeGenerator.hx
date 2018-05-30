@@ -4,14 +4,14 @@ import graphql.ASTDefs;
 import haxe.ds.Either;
 
 
-@:enum abstract OutputTyping(String) {
+@:enum abstract GenerateOption(String) {
   var TYPEDEFS = 'typedefs';
   var CLASSES = 'classes';
 }
 
 typedef HxGenOptions = {
-  ?type:OutputTyping,
-  ?null_wraps:Bool
+  ?generate:GenerateOption,
+  ?disable_null_wrappers:Bool
 }
 
 // key String is field_name
@@ -51,8 +51,8 @@ class HaxeGenerator
   private function init_options(?options:HxGenOptions)
   {
     _options = options==null ? {} : options;
-    if (_options.type==null) _options.type = TYPEDEFS;
-    if (!(_options.null_wraps==false)) _options.null_wraps = true;
+    if (_options.generate==null) _options.generate = TYPEDEFS;
+    if (_options.disable_null_wrappers==null) _options.disable_null_wrappers = false;
   }
 
   // Parse a graphQL AST document, generating Haxe code
@@ -195,10 +195,10 @@ class HaxeGenerator
         type.optional = false;
         if (short_format) {
           // Outer optional gets converted to ?
-          type_str = (outer_optional ? '?' : '') + field_name + ': '+type.toString(_options.null_wraps==true) + ',';
+          type_str = (outer_optional ? '?' : '') + field_name + ': '+type.toString(_options.disable_null_wrappers==true) + ',';
         } else {
           // Outer optional gets converted to @:optional
-          type_str = (outer_optional ? '@:optional' : '') + 'var ' + field_name + ': ' + type.toString(_options.null_wraps==true) + ';';
+          type_str = (outer_optional ? '@:optional' : '') + 'var ' + field_name + ': ' + type.toString(_options.disable_null_wrappers==true) + ';';
         }
         _stdout_writer.append('  '+type_str);
       }

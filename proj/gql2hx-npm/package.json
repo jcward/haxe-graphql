@@ -1,17 +1,33 @@
 {
   "name": "gql2hx",
-  "version": "0.0.1",
-  "description": "Prints GraphQL IDL to Haxe types",
-  "private": true,
+  "version": "0.0.2",
+  "description": "Convert GraphQL schema to Haxe definitions",
+  "perferGlobal": true,
+  "license": "MIT",
+  "author": {
+    "name": "Jeff Ward",
+    "email": "jeff.ward@wootmath.com",
+    "url": "https://www.wootmath.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jcward/haxe-graphql.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jcward/haxe-graphql/issues"
+  },
+  "bin": { "gql2hx": "./dist/index.js" },
+  "main": "dist/index.js",
   "dependencies": {
+    "commander": "^2.15.1",
     "graphql": "^0.13.2"
   },
   "devDependencies": {
     "@types/node": "^10.1.2"
   },
   "scripts": {
-    "build": "haxe build.hxml && cp src/index.js ./dist/",
+    "build": "haxe build.hxml && cp src/*.js ./dist/",
     "debug": "npm run build && node --nolazy --inspect-brk=13729 src/index.js",
-    "test": "npm run build && node dist/index.js"
+    "test": "npm run build && node dist/index.js -i test/StarWarsTest.gql -o .tmp/StarWars.hx"
   }
 }
