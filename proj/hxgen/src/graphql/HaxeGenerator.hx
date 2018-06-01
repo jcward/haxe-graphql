@@ -89,7 +89,7 @@ class HaxeGenerator
         write_haxe_typedef(def);
         newline();
       case ASTDefs.Kind.UNION_TYPE_DEFINITION:
-        write_union_as_haxe_enum(def);
+        write_union_as_haxe_abstract(def);
         newline();
       case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
         // Interfaces are a no-op in the second pass
@@ -248,17 +248,19 @@ class HaxeGenerator
   function write_haxe_scalar(def:ASTDefs.ScalarTypeDefinitionNode) {
     // trace('Generating scalar: '+def.name.value);
     type_defined(def.name.value);
-    _stdout_writer.append('/* scalar ${ def.name.value } */\nabstract ${ def.name.value }(Dynamic) from Dynamic to Dynamic { }');
+    _stdout_writer.append('/* scalar ${ def.name.value } */\nabstract ${ def.name.value }(Dynamic) { }');
   }
 
-  function write_union_as_haxe_enum(def:ASTDefs.UnionTypeDefinitionNode) {
+  function write_union_as_haxe_abstract(def:ASTDefs.UnionTypeDefinitionNode) {
     // trace('Generating union (enum): '+def.name.value);
     type_defined(def.name.value);
-    _stdout_writer.append('enum '+def.name.value+' { // Union');
+    _stdout_writer.append('/* union '+def.name.value+' = ${ def.types.map(function(t) return t.name.value).join(" | ") } */');
+    _stdout_writer.append('abstract '+def.name.value+'(Dynamic) {');
     for (type in def.types) {
       if (type.name==null) throw 'Expecting Named Type';
+      var type_name = type.name.value;
       type_referenced(def.name.value);
-      _stdout_writer.append('  is_'+type.name.value+'(value:'+type.name.value+');');
+      _stdout_writer.append(' @:from static function from${ type_name }(v:${ type_name }) return cast v;');
     }
     _stdout_writer.append('}');
   }
