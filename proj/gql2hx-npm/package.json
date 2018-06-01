@@ -1,6 +1,6 @@
 {
   "name": "gql2hx",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Convert GraphQL schema to Haxe definitions",
   "perferGlobal": true,
   "license": "MIT",
@@ -28,6 +28,7 @@
   "scripts": {
     "build": "haxe build.hxml && cp src/*.js ./dist/",
     "debug": "npm run build && node --nolazy --inspect-brk=13729 src/index.js",
-    "test": "npm run build && node dist/index.js -i test/StarWarsTest.gql -o .tmp/StarWars.hx"
+    "test": "npm run build && node dist/index.js -i test/StarWarsTest.gql -o .tmp/StarWars.hx",
+    "prepare": "npm run build"
   }
 }
