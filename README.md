@@ -4,6 +4,10 @@ Utilities for working with Haxe and GraphQL.
 
 **Status:** alpha - see various projects for their feature / compatibility notes.
 
+[Try gql2hx live in your browser!](http://jcward.com/gql2hx/)
+
+[<img src="./proj/webdemo/demo.gif" width=450 alt="gql2hx web demo">](http://jcward.com/gql2hx/)
+
 See the various directories under `./proj`:
 
 - [hxgen](./proj/hxgen) - GraphQL AST to Haxe Code Generator
