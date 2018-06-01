@@ -1,6 +1,6 @@
 # haxe-graphql
 
-Utilities for working with Haxe and GraphQL.
+Tools for parsing GraphQL schema and queries into Haxe type definitions.
 
 **Status:** alpha - see various projects for their feature / compatibility notes.
 
@@ -10,9 +10,9 @@ Utilities for working with Haxe and GraphQL.
 
 See the various directories under `./proj`:
 
-- [hxgen](./proj/hxgen) - GraphQL AST to Haxe Code Generator
-- [parser](./proj/parser) - Prototype .graphql to AST parser written in Haxe
-- [gql2hx-npm](./proj/gql2hx-npm) - NPM module packaging the HaxeGenerator
-- [gql2hx-haxelib](./proj/gql2hx-haxelib) - Haxelib module providing macro-time access to these tools
+- [hxgen](./proj/hxgen) - Haxe Code Generator (from GraphQL AST)
+- [parser](./proj/parser) - Pure-Haxe GraphQL parser (.graphql to GraphQL AST, built on tink_parse)
+- [gql2hx-npm](./proj/gql2hx-npm) - NPM module packaging the Haxe Generator (uses official graphql module for parsing)
+- [gql2hx-haxelib](./proj/gql2hx-haxelib) - Haxelib module providing macro-time access to these tools (uses Haxe-based parser)
 - [ast](./proj/ast) - GraphQL AST Definitions
 - [webdemo](./proj/webdemo) - live demo of .graphql -> Haxe code
