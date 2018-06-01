@@ -1,4 +1,6 @@
 
+scalar Date
+
 enum Greetings {
   Hello
   Hi
@@ -19,6 +21,7 @@ type Person implements INamed & IAged { # Some comment
   name : String!
   age   :Int
   friends: [Person!]
+  birthday: Date
 }
 
  # type NotToBeParsed {

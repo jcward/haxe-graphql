@@ -79,6 +79,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       case Success(v) if (v=="schema"): readTypeDefinition(p, false, true);
       case Success(v) if (v=="enum"): readEnumDefinition(p);
       case Success(v) if (v=="union"): readUnionDefinition(p);
+      case Success(v) if (v=="scalar"): readScalarDefinition(p);
       case Success(_): Failure(makeError('Got "${ source[p...pos] }", expecting keyword: type interface enum schema union', makePos(p)));
       case Failure(e): Failure(e);
     }
@@ -169,6 +170,21 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     }
     def.loc.end = pos;
 
+    skipWhitespace(true);
+    return Success(def);
+  }
+
+  private function readScalarDefinition(start:Int):Outcome<BaseNode, Err>
+  {
+    var def:ScalarTypeDefinitionNode = {
+      loc: { start:start, end:pos, source:_filename, startToken:null, endToken:null },
+      kind:Kind.SCALAR_TYPE_DEFINITION,
+      name:null
+    };
+    skipWhitespace(true);
+    var name:String = ident().sure();
+    def.name = mkNameNode(name);
+    def.loc.end = pos;
     skipWhitespace(true);
     return Success(def);
   }

@@ -60,6 +60,8 @@ class HaxeGenerator
     // Parse definitions
     init_base_types();
 
+    function newline() _stdout_writer.append('');
+
     // First pass: parse interfaces only
     // - when outputing typedefs, types will "> extend" interfaces, removing duplicate fields
     // - TODO: is this proper behavior? Or can type field be a super-set of the interface field?
@@ -70,18 +72,25 @@ class HaxeGenerator
       switch (def.kind) {
         case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
         write_interface_as_haxe_base_typedef(def);
+        newline();
       }
     }
 
     // Second pass: parse everything else
     for (def in doc.definitions) {
       switch (def.kind) {
+      case ASTDefs.Kind.SCALAR_TYPE_DEFINITION:
+        write_haxe_scalar(def);
+        newline();
       case ASTDefs.Kind.ENUM_TYPE_DEFINITION:
         write_haxe_enum(def);
+        newline();
       case ASTDefs.Kind.OBJECT_TYPE_DEFINITION:
         write_haxe_typedef(def);
+        newline();
       case ASTDefs.Kind.UNION_TYPE_DEFINITION:
         write_union_as_haxe_enum(def);
+        newline();
       case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
         // Interfaces are a no-op in the second pass
       default:
@@ -234,6 +243,12 @@ class HaxeGenerator
       _stdout_writer.append('  '+enum_value.name.value+';');
     }
     _stdout_writer.append('}');
+  }
+
+  function write_haxe_scalar(def:ASTDefs.ScalarTypeDefinitionNode) {
+    // trace('Generating scalar: '+def.name.value);
+    type_defined(def.name.value);
+    _stdout_writer.append('/* scalar ${ def.name.value } */\nabstract ${ def.name.value }(Dynamic) from Dynamic to Dynamic { }');
   }
 
   function write_union_as_haxe_enum(def:ASTDefs.UnionTypeDefinitionNode) {
