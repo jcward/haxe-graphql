@@ -345,7 +345,9 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
 
       skipWhitespace(true);
       if (allow('=')) {
-throw 'TODO: parse default values';
+        var dv = readValue();
+        if (!dv.isSuccess()) return Failure(dv.getParameters()[0]);
+        iv.defaultValue = dv.sure();
       }
 
       skipWhitespace(true);
@@ -356,8 +358,155 @@ throw 'TODO: parse default values';
     return Success(args);
   }
 
+  private function readValue():Outcome<ValueNode, Err>
+  {
+    //  typedef IntValueNode >  value: String,
+    //  typedef FloatValueNode >  value: String,
+    //  typedef StringValueNode >  value: String,  ?block: Bool,
+    //  typedef BooleanValueNode >  value: Bool,
+    //  typedef NullValueNode 
+    //  typedef EnumValueNode >  value: String,
+    //  typedef ListValueNode >  values: ReadonlyArray<ValueNode>,
+    //  typedef ObjectValueNode > fields: ReadonlyArray<ObjectFieldNode>, // name:value
+
+    skipWhitespace(true);
+
+    var num = readNumeric();
+    if (num!=null) {
+      var v = {
+        kind:num.is_float ? Kind.FLOAT : Kind.INT,
+        value:num.value
+      };
+      return Success(cast v);
+    }
+
+    var str = readString();
+    if (str!=null) {
+      var v = { value:str.value, block:str.is_block };
+      return Success(cast v);
+    }
+
+    if (allowHere('true')) return Success(cast { kind:Kind.BOOLEAN, value:true });
+    if (allowHere('false')) return Success(cast { kind:Kind.BOOLEAN, value:false });
+    if (allowHere('null')) return Success(cast { kind:Kind.NULL, value:false });
+    if (is(IDENT_START)) return Success(cast { kind:Kind.ENUM, value:ident(true) });
+
+    if (is('['.code)) return Success(cast { kind:Kind.LIST, values:readArrayValues() });
+    if (is('{'.code)) return Success(cast { kind:Kind.OBJECT, fields:readObjectFields() });
+
+    throw makeError('Expected value but found ${ source.get(pos) }', makePos(pos));
+    return null;
+  }
+
+  private function readNumeric():Null<{ value:String, is_float:Bool}>
+  {
+    // http://facebook.github.io/graphql/draft/#sec-Int-Value
+    var reset = pos;
+    var negative = allowHere('-');
+    var is_float = false;
+    var num:String = readWhile(DIGIT);
+    if (num==null || num.length==0) {
+      pos = reset;
+      return null;
+    }
+    if (negative) num = '-'+num;
+    var dot = allowHere('.');
+    if (dot) {
+      is_float = true;
+      num += '.';
+      num += readWhile(DIGIT);
+    }
+    var exp = is(EXP) ? 'e' : null;
+    if (exp!=null) {
+      is_float = true;
+      num += 'e'; pos++;
+      var neg_exp = allowHere('-');
+      var eval = readWhile(DIGIT);
+      if (eval.length!=1) throw makeError('Invalid exponent ${ eval }', makePos(pos));
+      num += (neg_exp ? '-' : '') + eval;
+    }
+    return { value:num, is_float:is_float };
+  }
+
+  private function readString():Null<{ value:String, is_block:Bool}>
+  {
+    // http://facebook.github.io/graphql/draft/#sec-String-Value
+    var reset = pos;
+    var is_quote = allowHere('"');
+    if (!is_quote) {
+      pos = reset;
+      return null;
+    }
+
+    // TODO: Unicode? block strings?
+    var is_block = allowHere('""');
+    var last_char:Int = 0;
+    var str = new StringBuf();
+
+    while (true) {
+      var char = source.fastGet(pos++);
+
+      // quote, test if it's an exit
+      if (char=='"'.code) { // quote
+        if (last_char!='\\'.code) { // not an escaped quote
+          if (!is_block) break;
+          // peek forward block break
+          if (is_block && source.get(pos)=='"'.code && source.get(pos+1)=='"'.code) {
+            pos = pos + 2;
+            break;
+          }
+        }
+      }
+      last_char = char;
+      // TODO: what about r f b?
+      if (!is_block && char==13) str.add("\\n");
+      else if (!is_block && char==9) str.add("\\t");
+      else str.addChar(char);
+    }
+
+    return { value:str.toString(), is_block:is_block };
+  }
+
+  private function readArrayValues():Array<ValueNode>
+  {
+    var values = [];
+    expect('[');
+    while(true) {
+      var val = readValue();
+      if (!val.isSuccess()) throw makeError(val.getParameters()[0], makePos(pos));
+      values.push(val.sure());
+      skipWhitespace(true);
+      if (allow(']')) break;
+      expect(',');
+    }
+    return values;
+  }
+
+  private function readObjectFields():Array<ObjectFieldNode>
+  {
+    var fields = [];
+    expect('{');
+    while (true) {
+      skipWhitespace(true);
+      var key = readString();
+      if (key==null) throw makeError('Expecting object key', makePos(pos));
+      if (key.is_block) throw makeError('Object keys don\'t support block strings', makePos(pos));
+      skipWhitespace(true);
+      expect(':');
+      var val = readValue();
+      if (!val.isSuccess()) throw makeError(val.getParameters()[0], makePos(pos));
+      var nn:NameNode = { kind:Kind.NAME, value:key.value };
+      var of:ObjectFieldNode = { kind:Kind.OBJECT_FIELD, name:nn, value:val.sure() };
+      fields.push(of);
+      if (allow('}')) break;
+      expect(',');
+    }
+    return fields;
+  }
+
   private inline function fail(msg) return Failure(makeError(msg, makePos(pos)));
 
+  static var EXP = @:privateAccess tink.parse.Filter.ofConst('e'.code) || @:privateAccess tink.parse.Filter.ofConst('E'.code);
   static var IDENT_START = UPPER || LOWER || '_'.code;
   static var IDENT_CONTD = IDENT_START || DIGIT;
 

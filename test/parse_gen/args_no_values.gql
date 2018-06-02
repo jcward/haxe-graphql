@@ -7,5 +7,5 @@ enum SortType {
 type Person {
   name:String!
   age:Int
-  friends( named: [String], sort_order:SortType):[Person]
+  friends( named: String, sort_order:SortType):[Person]
 }
