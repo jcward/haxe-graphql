@@ -1,0 +1,17 @@
+sudo: required
+dist: trusty
+
+os:
+  - linux
+
+language: haxe
+haxe:
+  - stable
+
+install:
+  - haxelib install tink_core
+  - haxelib install tink_parse
+  - haxelib install buddy
+
+script:
+  - haxe travis.hxml
