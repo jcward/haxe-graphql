@@ -16,3 +16,14 @@ interesting and flexible use cases:
   - Although, perhaps the graphql module compiles to browser-friendly js?
 
 Hence, I built this one on top of [tink_parse](https://github.com/haxetink/tink_parse).
+
+GraphQL schema support:
+- [x] Schema
+  - [x] type, interface, union, enum, scalar
+  - [x] lists and not-nulls
+  - [x] Arguments
+    - [x] Default values
+  - [ ] Annotations
+  - [ ] Directives
+- [ ] Queries
+- [ ] Locations and tokens
