@@ -14,4 +14,4 @@ install:
   - haxelib install buddy
 
 script:
-  - haxe travis.hxml
+  - haxe --cwd test/buddy go_buddy.hxml
