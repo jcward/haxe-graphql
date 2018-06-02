@@ -1,0 +1,16 @@
+# Parser
+../../proj/parser/depends.hxml
+-cp ../../proj/parser/src
+
+# Generator
+-cp ../../proj/hxgen/src
+
+# AST / Utils
+-cp ../../proj/ast/src
+-cp ../../proj/utils/src
+
+# Test
+-lib buddy
+-cp .
+-x Main
+

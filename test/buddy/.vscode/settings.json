@@ -1,0 +1,10 @@
+{
+    "haxe.displayConfigurations": [
+        ["go_buffy.hxml"]
+    ],
+    "haxe.displayServer": {
+        "arguments": [
+            //"-v"
+        ]
+    }
+}
