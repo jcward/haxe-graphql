@@ -4,15 +4,14 @@ GraphQL to Haxe: Haxe Generator
 Takes GraphQL schema definition AST and turn it into Haxe code.
 
 GraphQL schema support:
-- [x] Basic schema
-  - [x] type, interface, union, enum
+- [x] Schema
+  - [x] type, interface, union, enum, scalar
     - [ ] review covariance of interface field and type field
   - [x] lists and not-nulls
-  - [ ] scalar
-  - [ ] schema
-- [ ] Arguments
+  - [x] scalar
+  - [x] Arguments (generates type for arguments)
 - [ ] Queries
-- [ ] Yadda yadda
+- [ ] Optionally generate classes / interfaces
 
 Options:
 ----
