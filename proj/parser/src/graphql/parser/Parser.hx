@@ -444,6 +444,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     var str = new StringBuf();
 
     while (true) {
+      if (pos==source.length) throw makeError('Unterminated string', makePos(reset));
       var char = source.fastGet(pos++);
 
       // quote, test if it's an exit
@@ -471,6 +472,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   {
     var values = [];
     expect('[');
+    if (allow(']')) return values;
     while(true) {
       var val = readValue();
       if (!val.isSuccess()) throw makeError(val.getParameters()[0], makePos(pos));
@@ -486,6 +488,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   {
     var fields = [];
     expect('{');
+    if (allow('}')) return fields;
     while (true) {
       skipWhitespace(true);
       var key = readString();
