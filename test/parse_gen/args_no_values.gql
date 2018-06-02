@@ -1,0 +1,11 @@
+
+enum SortType {
+ ASCENDING
+ DESCENDING
+}
+
+type Person {
+  name:String!
+  age:Int
+  friends( named: [String], sort_order:SortType):[Person]
+}

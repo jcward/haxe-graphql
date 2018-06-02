@@ -1,0 +1,16 @@
+# Parser
+proj/parser/depends.hxml
+#-lib tink_parse
+#-lib tink_core
+-cp proj/parser/src
+
+# Generator
+-cp proj/hxgen/src
+
+# AST / Utils
+-cp proj/ast/src
+-cp proj/utils/src
+
+# Test "Main" as it depends on parser and hxgen
+-cp test/parse_gen
+Test

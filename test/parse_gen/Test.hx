@@ -5,7 +5,9 @@ class Test
   public static function main()
   {
     test('basic.gql');
-    test('schema-kitchen-sink.graphql');
+    test('args_no_values.gql');
+    test('arguments.gql');
+    //test('schema-kitchen-sink.graphql');
   }
 
   private static function test(fn)

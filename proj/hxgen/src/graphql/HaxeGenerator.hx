@@ -3,7 +3,6 @@ package graphql;
 import graphql.ASTDefs;
 import haxe.ds.Either;
 
-
 @:enum abstract GenerateOption(String) {
   var TYPEDEFS = 'typedefs';
   var CLASSES = 'classes';
@@ -55,6 +54,19 @@ class HaxeGenerator
     if (_options.disable_null_wrappers==null) _options.disable_null_wrappers = false;
   }
 
+  private function handle_args(type_path:Array<String>, args:FieldArguments) {
+    if (args==null || args.length==0) return;
+    for (a in args) {
+      var args_name = 'Args_${ type_path.join('Dot') }_${ a.field }';
+      var args_obj:ObjectTypeDefinitionNode = {
+        kind:Kind.OBJECT_TYPE_DEFINITION,
+        name:{ value:args_name, kind:Kind.NAME },
+        fields:cast a.arguments
+      };
+      write_haxe_typedef(args_obj);
+    }
+  }
+
   // Parse a graphQL AST document, generating Haxe code
   private function parse_document(doc:Document) {
     // Parse definitions
@@ -71,8 +83,9 @@ class HaxeGenerator
     for (def in doc.definitions) {
       switch (def.kind) {
         case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
-        write_interface_as_haxe_base_typedef(def);
+        var args = write_interface_as_haxe_base_typedef(def);
         newline();
+        handle_args([get_def_name(def)], args);
       }
     }
 
@@ -86,8 +99,9 @@ class HaxeGenerator
         write_haxe_enum(def);
         newline();
       case ASTDefs.Kind.OBJECT_TYPE_DEFINITION:
-        write_haxe_typedef(def);
+        var args = write_haxe_typedef(def);
         newline();
+        handle_args([get_def_name(def)], args);
       case ASTDefs.Kind.UNION_TYPE_DEFINITION:
         write_union_as_haxe_abstract(def);
         newline();
@@ -104,6 +118,8 @@ class HaxeGenerator
       stdout:_stdout_writer.toString()
     };
   }
+
+  private function get_def_name(def) return def.name.value;
 
   public function toString() return _stdout_writer.toString();
 
@@ -155,7 +171,10 @@ class HaxeGenerator
   /**
    * @param {GraphQL.ObjectTypeDefinitionNode} def
    */
-  function write_haxe_typedef(def:ASTDefs.ObjectTypeDefinitionNode) {
+  function write_haxe_typedef(def:ASTDefs.ObjectTypeDefinitionNode):FieldArguments
+  {
+    var args:FieldArguments = [];
+
     // TODO: cli args for:
     //  - long vs short typedef format
     var short_format = true;
@@ -192,6 +211,10 @@ class HaxeGenerator
       var type = parse_type(field.type);
       var field_name = field.name.value;
 
+      if (field.arguments!=null && field.arguments.length>0) {
+        args.push({ field:field_name, arguments:field.arguments });
+      }
+
       if (skip_interface_fields.exists(field_name)) {
         // Field is inherited from an interface, ensure the types match
         if (!type0_equal_to_type1(type, skip_interface_fields.get(field_name))) {
@@ -215,9 +238,14 @@ class HaxeGenerator
 
     if (short_format) _stdout_writer.chomp_trailing_comma(); // Haxe doesn't care, but let's be tidy
     _stdout_writer.append('}');
+
+    return args;
   }
 
-  function write_interface_as_haxe_base_typedef(def:ASTDefs.ObjectTypeDefinitionNode) {
+  function write_interface_as_haxe_base_typedef(def:ASTDefs.ObjectTypeDefinitionNode):FieldArguments
+  {
+    var args:FieldArguments = [];
+
     if (def.name==null || def.name.value==null) throw 'Expecting interface must have a name';
     var name = def.name.value;
     if (_interfaces.exists(name)) throw 'Duplicate interface named '+name;
@@ -227,12 +255,18 @@ class HaxeGenerator
       var type = parse_type(field.type);
       var field_name = field.name.value;
       intf[field_name] = type;
+
+      if (field.arguments!=null && field.arguments.length>0) {
+        args.push({ field:field_name, arguments:field.arguments });
+      }
     }
 
     _interfaces[name] = intf;
 
     // Generate the interface like a type
     write_haxe_typedef(def);
+
+    return args;
   }
 
   function write_haxe_enum(def:ASTDefs.EnumTypeDefinitionNode) {
@@ -254,7 +288,8 @@ class HaxeGenerator
   function write_union_as_haxe_abstract(def:ASTDefs.UnionTypeDefinitionNode) {
     // trace('Generating union (enum): '+def.name.value);
     type_defined(def.name.value);
-    _stdout_writer.append('/* union '+def.name.value+' = ${ def.types.map(function(t) return t.name.value).join(" | ") } */');
+    var union_types_note = def.types.map(function(t) return t.name.value).join(" | ");
+    _stdout_writer.append('/* union '+def.name.value+' = ${ union_types_note } */');
     _stdout_writer.append('abstract '+def.name.value+'(Dynamic) {');
     for (type in def.types) {
       if (type.name==null) throw 'Expecting Named Type';
@@ -358,3 +393,8 @@ private class TypeStringifier
   }
 }
 typedef TSChildOrBareString = OneOf<TypeStringifier,String>;
+
+typedef FieldArguments = Array<{
+  field:String,
+  arguments:Array<InputValueDefinitionNode>
+}>

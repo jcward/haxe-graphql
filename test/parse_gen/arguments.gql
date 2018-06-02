@@ -1,0 +1,12 @@
+
+enum SortType {
+ ASCENDING
+ DESCENDING
+}
+
+type Person {
+  name:String!
+  age:Int
+  friends( named: [String] = ["default_joe", "default_suzie"],
+           sort_order:SortType = DESCENDING ):[Person]
+}

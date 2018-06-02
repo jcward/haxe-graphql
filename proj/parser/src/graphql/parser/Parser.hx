@@ -29,6 +29,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   {
     super(schema);
     _filename = filename;
+
     try {
       document = readDocument();
     } catch (e:Err) {
@@ -100,18 +101,19 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     var interfaces = [];
     skipWhitespace(true);
     if (!is_schema) {
-      var name:String = ident().sure();
-      def.name = mkNameNode(name);
+      var name = readNameNode();
+      if (!name.isSuccess()) return Failure(name.getParameters()[0]);
+      def.name = name.sure();
       skipWhitespace(true);
     }
 
     var err:Outcome<BaseNode, Err> = null;
     if (allow('implements')) {
       if (is_interface) return fail('Interfaces cannot implement interfaces.');
-      parseRepeatedly(function() {
-        var i = ident();
-        if (!i.isSuccess()) { err = Failure(i.getParameters()[0]); return; }
-        var if_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:mkNameNode(i.sure()) };
+      parseRepeatedly(function():Void {
+        var name = readNameNode();
+        if (!name.isSuccess()) err = Failure(name.getParameters()[0]);
+        var if_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:name.sure() };
         interfaces.push(if_type);
       }, {end:'{', sep:'&', allowTrailing:false});
     } else {
@@ -143,7 +145,19 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       return Success(onode);
     }
   }
-  function mkNameNode(name:String) return { kind:Kind.NAMED_TYPE, value:name, loc:null };
+
+  private function readNameNode(skip_whitespace:Bool=true):Outcome<NameNode, Err>
+  {
+    if (skip_whitespace) skipWhitespace(true);
+    var start = pos;
+    return try {
+      var name:String = ident().sure();
+      var loc = { start:start, end:pos, source:_filename, startToken:null, endToken:null };
+      Success({ kind:Kind.NAMED_TYPE, value:name, loc:loc });
+    } catch (e:Dynamic) {
+      Failure(makeError('Name identifier expected', makePos(pos)));  
+    }
+  }
 
   private function readEnumDefinition(start:Int):Outcome<BaseNode, Err>
   {
@@ -153,17 +167,17 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       name:null,
       values:[]
     };
-    skipWhitespace(true);
-    var name:String = ident().sure();
-    def.name = mkNameNode(name);
+
+    var name = readNameNode();
+    if (!name.isSuccess()) return Failure(name.getParameters()[0]);
+    def.name = name.sure();
     skipWhitespace(true);
 
     expect('{');
     while (true) {
-      skipWhitespace(true);
-      var i = ident();
-      if (!i.isSuccess()) return Failure(i.getParameters()[0]);
-      var ev:EnumValueDefinitionNode = { kind:Kind.NAMED_TYPE, name:mkNameNode(i.sure()) };
+      var name = readNameNode();
+      if (!name.isSuccess()) return Failure(name.getParameters()[0]);
+      var ev:EnumValueDefinitionNode = { kind:Kind.NAMED_TYPE, name:name.sure() };
       def.values.push(ev);
       skipWhitespace(true);
       if (allow('}')) break;
@@ -182,8 +196,9 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       name:null
     };
     skipWhitespace(true);
-    var name:String = ident().sure();
-    def.name = mkNameNode(name);
+    var name = readNameNode();
+    if (!name.isSuccess()) return Failure(name.getParameters()[0]);
+    def.name = name.sure();
     def.loc.end = pos;
     skipWhitespace(true);
     return Success(def);
@@ -197,17 +212,16 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       name:null,
       types:[]
     };
-    skipWhitespace(true);
-    var name:String = ident().sure();
-    def.name = mkNameNode(name);
+    var name = readNameNode();
+    if (!name.isSuccess()) return Failure(name.getParameters()[0]);
+    def.name = name.sure();
     skipWhitespace(true);
 
     expect('=');
     while (true) {
-      skipWhitespace(true);
-      var i = ident();
-      if (!i.isSuccess()) return Failure(i.getParameters()[0]);
-      var u_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:mkNameNode(i.sure()) };
+      var name = readNameNode();
+      if (!name.isSuccess()) return Failure(name.getParameters()[0]);
+      var u_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:name.sure() };
       def.types.push(u_type);
       if (!allow('|')) break;
     }
@@ -228,43 +242,22 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       arguments:[],
       directives:[]
     };
-    
-    var list_wrap = false;
-    var inner_not_null = false;
-    var outer_not_null = false;
-    var name:String = ident().sure();
-    def.name = mkNameNode(name);
-    //TODO: ( ... queries ? )
-    expect(':');
-    if (allow('[')) list_wrap = true;
-    skipWhitespace();
-    var i = ident();
-    if (!i.isSuccess()) { return Failure(i.getParameters()[0]); }
-    var named_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:mkNameNode(i.sure()) }
-    skipWhitespace();
-    if (list_wrap) {
-      if (allow('!')) inner_not_null = true;
-      skipWhitespace();
-      expect(']');
-    }
-    skipWhitespace();
-    if (allow('!')) outer_not_null = true;
 
-    // Wrap the NamedTypeNode in List and/or NonNull wrappers
-    var t:TypeNode = def;
-    if (outer_not_null) {
-      t.type = cast { type:null, kind:Kind.NON_NULL_TYPE };
-      t = t.type;
+    var name = readNameNode();
+    if (!name.isSuccess()) return Failure(name.getParameters()[0]);
+    def.name = name.sure();
+
+    if (allow('(')) {
+      var args = readArguments();
+      if (!args.isSuccess()) return Failure(args.getParameters()[0]);
+      def.arguments = args.sure();
     }
-    if (list_wrap) {
-      t.type = cast { type:null, kind:Kind.LIST_TYPE };
-      t = t.type;
-    }
-    if (inner_not_null) {
-      t.type = cast { type:null, kind:Kind.NON_NULL_TYPE };
-      t = t.type;
-    }
-    t.type = cast named_type;
+
+    skipWhitespace();
+    var type = readTypeNode();
+    if (!type.isSuccess()) return Failure(type.getParameters()[0]);
+    def.type = cast type.sure();
+
     def.loc.end = pos;
     skipWhitespace(true);
     return Success(def);
@@ -280,6 +273,88 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   //  if (!found) this.pos = pos;
   //  return found;
   //}
+
+  private function readTypeNode():Outcome<graphql.TypeNode, Err>
+  {
+    var list_wrap = false;
+    var inner_not_null = false;
+    var outer_not_null = false;
+
+    expect(':');
+    if (allow('[')) list_wrap = true;
+    var name = readNameNode();
+    if (!name.isSuccess()) return Failure(name.getParameters()[0]);
+    var named_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:name.sure() }
+    skipWhitespace();
+    if (list_wrap) {
+      if (allow('!')) inner_not_null = true;
+      skipWhitespace();
+      expect(']');
+    }
+    skipWhitespace();
+    if (allow('!')) outer_not_null = true;
+
+    // Wrap the NamedTypeNode in List and/or NonNull wrappers
+    var type:TypeNode = null;
+    var ref:TypeNode = null;
+    function update_ref(t:TypeNode) {
+      if (type==null) {
+        type = t;
+        ref = t;
+      } else {
+        ref.type = t;
+        ref = t;
+      }
+    }
+
+    if (outer_not_null) update_ref(cast { type:null, kind:Kind.NON_NULL_TYPE });
+    if (list_wrap) update_ref({ type:null, kind:Kind.LIST_TYPE });
+    if (inner_not_null) update_ref({ type:null, kind:Kind.NON_NULL_TYPE } );
+    update_ref(cast named_type);
+
+    return Success(type);
+  }
+
+  private function readArguments():Outcome<Array<graphql.InputValueDefinitionNode>, Err>
+  {
+    var args = [];
+
+    while (true) {
+      var iv:graphql.InputValueDefinitionNode = {
+        type : null, // graphql.TypeNode,
+        name : null, // graphql.NameNode,
+        loc : null, // Null<graphql.Location>,
+        kind : Kind.INPUT_VALUE_DEFINITION, // String,
+        directives : null,  // Null<graphql.ReadonlyArray<graphql.DirectiveNode>>,
+        description : null, // Null<graphql.StringValueNode>,
+        defaultValue : null // Null<graphql.ValueNode>
+      };
+      var name = readNameNode();
+      if (!name.isSuccess()) return Failure(name.getParameters()[0]);
+      iv.name = name.sure();
+
+      skipWhitespace(true);
+      var type = readTypeNode();
+      if (!type.isSuccess()) return Failure(type.getParameters()[0]);
+      iv.type = cast type.sure();
+
+      args.push(iv);
+
+      skipWhitespace(true);
+      if (allow(')')) break;
+
+      skipWhitespace(true);
+      if (allow('=')) {
+throw 'TODO: parse default values';
+      }
+
+      skipWhitespace(true);
+      if (allow(')')) break;
+      expect(',');
+    }
+
+    return Success(args);
+  }
 
   private inline function fail(msg) return Failure(makeError(msg, makePos(pos)));
 

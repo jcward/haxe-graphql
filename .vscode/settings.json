@@ -1,0 +1,10 @@
+{
+    "haxe.displayConfigurations": [
+        [".vscode/display.hxml"]
+    ],
+    "haxe.displayServer": {
+        "arguments": [
+            "-v"
+        ]
+    }
+}
