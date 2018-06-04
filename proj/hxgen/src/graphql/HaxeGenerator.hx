@@ -25,16 +25,24 @@ class HaxeGenerator
   private var _options:HxGenOptions;
 
   public static function parse(doc:Document,
-                               ?options:HxGenOptions):{ stdout:String, stderr:String }
+                               ?options:HxGenOptions,
+                               throw_on_error=true):{ stdout:String, stderr:String }
   {
-    var gen = new HaxeGenerator(options);
+    var result = { stdout:'', stderr:'' };
 
     // Check for options / init errors
+    var gen = new HaxeGenerator(options);
     if (!gen._stderr_writer.is_empty()) {
-      return { stdout:'', stderr:gen._stderr_writer.toString() };
+      result.stderr = gen._stderr_writer.toString();
+    } else {
+      result = gen.parse_document(doc);
     }
 
-    return gen.parse_document(doc);
+    if (throw_on_error && result.stderr.length>0) {
+      throw result.stderr;
+    }
+
+    return result;
   }
 
   // Private constructor simply because, once parsed, the generator's state
@@ -92,6 +100,9 @@ class HaxeGenerator
     // Second pass: parse everything else
     for (def in doc.definitions) {
       switch (def.kind) {
+      case ASTDefs.Kind.SCHEMA_DEFINITION:
+        write_schema_def(def);
+        newline();
       case ASTDefs.Kind.SCALAR_TYPE_DEFINITION:
         write_haxe_scalar(def);
         newline();
@@ -299,6 +310,21 @@ class HaxeGenerator
     }
     _stdout_writer.append('}');
   }
+
+  // A schema definition is just a mapping / typedef alias to specific types
+  function write_schema_def(def:ASTDefs.SchemaDefinitionNode) {
+    _stdout_writer.append('/* Schema: */');
+    for (ot in def.operationTypes) {
+      var op = Std.string(ot.operation);
+      switch op {
+        case "query" | "mutation" | "subscription":
+        var capitalized = op.substr(0,1).toUpperCase() + op.substr(1);
+        _stdout_writer.append('typedef Schema${ capitalized }Type = ${ ot.type.name.value };');
+        default: throw 'Unexpected schema operation: ${ op }';
+      }
+    }
+  }
+
 
   // Init ID type as lenient abstract over String
   // TODO: optional require toIDString() for explicit string casting

@@ -1,0 +1,23 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Query {
+  people:[Person]!
+}
+
+type Mutation {
+  insert(p:Person):InsertResult
+}
+
+enum InsertResult {
+  Foo
+  Bar
+}
+
+type Person {
+  id:    ID!
+  name : String!
+  friends: [Person!]
+}

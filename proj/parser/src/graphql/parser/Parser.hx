@@ -73,43 +73,37 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   private function readDefinition():Outcome<BaseNode, Err>
   {
     skipWhitespace(true);
-    var p = pos;
+    var start = pos;
     var rtn:Outcome<BaseNode, Err> = switch ident(true) {
-      case Success(v) if (v=="type"): readTypeDefinition(p);
-      case Success(v) if (v=="interface"): readTypeDefinition(p, true);
-      case Success(v) if (v=="schema"): readTypeDefinition(p, false, true);
-      case Success(v) if (v=="enum"): readEnumDefinition(p);
-      case Success(v) if (v=="union"): readUnionDefinition(p);
-      case Success(v) if (v=="scalar"): readScalarDefinition(p);
-      case Success(_): Failure(makeError('Got "${ source[p...pos] }", expecting keyword: type interface enum schema union', makePos(p)));
+      case Success(v) if (v=="type"):      readTypeDefinition(start, Kind.OBJECT_TYPE_DEFINITION);
+      case Success(v) if (v=="interface"): readTypeDefinition(start, Kind.INTERFACE_TYPE_DEFINITION);
+      case Success(v) if (v=="schema"):    readSchemaDefinition(start);
+      case Success(v) if (v=="enum"):      readEnumDefinition(start);
+      case Success(v) if (v=="union"):     readUnionDefinition(start);
+      case Success(v) if (v=="scalar"):    readScalarDefinition(start);
+      case Success(_): Failure(makeError('Got "${ source[start...pos] }", expecting keyword: type interface enum schema union', makePos(start)));
       case Failure(e): Failure(e);
     }
     return rtn;
   }
 
-  private function readTypeDefinition(start:Int,
-                                      is_interface:Bool=false,
-                                      is_schema:Bool=false):Outcome<BaseNode, Err> {
-    var def = {
-      loc: { start:start, end:start, source:_filename, startToken:null, endToken:null  },
-      kind: Kind.OBJECT_TYPE_DEFINITION,
-      name:null,
-      fields:[]
-    };
-    if (is_interface) def.kind = Kind.INTERFACE_TYPE_DEFINITION;
-    if (is_schema) def.kind = Kind.SCHEMA_DEFINITION;
+  private function readTypeDefinition(start:Int, kind:String):Outcome<BaseNode, Err>
+  {
+    var def:TypeDefinitionNode = { loc:mkLoc(), kind:kind };
+
+    var is_interface = def.kind==Kind.INTERFACE_TYPE_DEFINITION;
+
+    var name = readNameNode();
+    if (!name.isSuccess()) return Failure(name.getParameters()[0]);
+    (cast def).name = name.sure();
+    skipWhitespace(true);
+
     var interfaces = [];
     skipWhitespace(true);
-    if (!is_schema) {
-      var name = readNameNode();
-      if (!name.isSuccess()) return Failure(name.getParameters()[0]);
-      def.name = name.sure();
-      skipWhitespace(true);
-    }
 
     var err:Outcome<BaseNode, Err> = null;
     if (allow('implements')) {
-      if (is_interface) return fail('Interfaces cannot implement interfaces.');
+      if (is_interface) return return Failure(makeError('Interfaces cannot implement interfaces.', makePos(pos)));
       parseRepeatedly(function():Void {
         var name = readNameNode();
         if (!name.isSuccess()) err = Failure(name.getParameters()[0]);
@@ -121,9 +115,10 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     }
     if (err!=null) return err;
 
+    var fields = (cast def).fields = [];
     while (true) {
       switch readFieldDefinition() {
-        case Success(field): def.fields.push(field);
+        case Success(field): fields.push(field);
         case Failure(e): return Failure(e);
       }
       if (allow('}')) break;
@@ -133,17 +128,47 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     skipWhitespace(true);
 
     if (is_interface) {
-      var inode:InterfaceTypeDefinitionNode = def;
+      var inode:InterfaceTypeDefinitionNode = cast def;
       return Success(inode);
-    } else if (is_schema) {
-      // TODO: var snode:SchemaDefinitionNode = def;
-      throw 'SchemaDefinitionNode is not yet supported...';
     } else {
       var onode:ObjectTypeDefinitionNode = {
-        name:def.name, loc:def.loc, kind:def.kind, fields:def.fields, interfaces:interfaces
+        name:name.sure(), loc:def.loc, kind:def.kind, fields:fields, interfaces:interfaces
       };
       return Success(onode);
     }
+  }
+
+  private function readSchemaDefinition(start:Int):Outcome<SchemaDefinitionNode, Err>
+  {
+    var def:SchemaDefinitionNode = { loc:mkLoc(), kind:Kind.SCHEMA_DEFINITION, operationTypes:[], directives:null };
+
+    skipWhitespace(true);
+    expect('{');
+    skipWhitespace(true);
+    while (true) {
+      if (is(IDENT_START)) {
+        var loc_start = pos;
+        var id = ident();
+        skipWhitespace(true);
+        var ntn_start = pos;
+        var ntn_out = readTypeNode();
+        if (!ntn_out.isSuccess()) return Failure(ntn_out.getParameters()[0]);
+        if (ntn_out.sure().kind!=Kind.NAMED_TYPE) return Failure(makeError('Expecting named type', makePos(ntn_start)));
+        var id_s = id.sure().toString();
+        switch id_s {
+          case "query" | "mutation" | "subscription":
+            var n:OperationTypeDefinitionNode = { kind:Kind.OPERATION_TYPE_DEFINITION, operation:id_s, type:ntn_out.sure() };
+            def.operationTypes.push(n);
+          default: return Failure(makeError('Unknown operation type ${ id_s }', makePos(loc_start)));
+        }
+      } else {
+        skipWhitespace(true);
+        expect('}');
+        break;
+      }
+    }
+
+    return Success(def);
   }
 
   private function readNameNode(skip_whitespace:Bool=true):Outcome<NameNode, Err>
@@ -507,7 +532,8 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return fields;
   }
 
-  private inline function fail(msg) return Failure(makeError(msg, makePos(pos)));
+  @:generic
+  private inline function fail<S>(msg:String):Outcome<S,Err> return Failure(makeError(msg, makePos(pos)));
 
   static var EXP = @:privateAccess tink.parse.Filter.ofConst('e'.code) || @:privateAccess tink.parse.Filter.ofConst('E'.code);
   static var IDENT_START = UPPER || LOWER || '_'.code;
@@ -541,5 +567,12 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   override function makeError(message:String, pos:Pos):Err
   {
     return { message:message, pos:pos };
+  }
+
+  function mkLoc(?start:Int, ?end:Int):Location
+  {
+    if (start==null) start = pos;
+    if (end==null) end = start;
+    return { start:start, end:end, source:_filename, startToken:null, endToken:null };
   }
 }

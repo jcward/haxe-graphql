@@ -8,28 +8,28 @@ class BasicSchema extends BuddySuite
 
   public static inline var gql = '
 
-scalar Date
-
-enum Greetings {
-  Hello
-  Hi
-  Salutations
+schema {
+  query: Query
+  mutation: Mutation
 }
 
-interface INamed {
-  name : String!
+type Query {
+  people:[Person]!
 }
 
-type Person implements INamed {
+type Mutation {
+  insert(p:Person):InsertResult
+}
+
+enum InsertResult {
+  Foo
+  Bar
+}
+
+type Person {
   id:    ID!
   name : String!
   friends: [Person!]
-  birthday: Date
-}
-
-type Dog implements INamed {
-  id:    ID!
-  name : String!
 }
 
 ';
@@ -50,21 +50,20 @@ type Dog implements INamed {
         parser.document.definitions.length.should.be(5);
       });
 
-      it("should generate the expected Haxe code", {
-        haxe.should.contain('typedef Person');
-        haxe.should.contain('typedef Dog');
-        haxe.should.contain('typedef INamed');
-        haxe.should.contain('abstract Date');
-        haxe.should.contain('enum Greetings');
-        haxe.should.contain('Salutations;');
+      it("should generate the expected schema aliases", {
+        haxe.should.contain('typedef SchemaQueryType = Query');
+        haxe.should.contain('typedef SchemaMutationType = Mutation');
       });
 
-      it("should generate proper optional typedef fields", {
-        haxe.should.contain('id:');
-        haxe.should.not.contain('?id:');
-        haxe.should.contain('?birthday:');
-        haxe.should.contain('?friends:');
-        haxe.should.not.contain('?name:');
+      it("should generate the basic type signatures", {
+        haxe.should.contain('typedef Query');
+        haxe.should.contain('typedef Mutation');
+        haxe.should.contain('typedef Person');
+        haxe.should.contain('enum InsertResult');
+      });
+
+      it("should generate an arg type for mutation insert", {
+        haxe.should.contain('typedef Args_Mutation_insert');
       });
 
     });

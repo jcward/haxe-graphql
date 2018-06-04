@@ -4,9 +4,11 @@ class Test
 {
   public static function main()
   {
-    test('basic.gql');
-    test('args_no_values.gql');
-    test('arguments.gql');
+    // test('StarWarsTest.gql');
+    test('basic_schema.gql');
+    // test('basic_types.gql');
+    // test('args_no_values.gql');
+    // test('arguments.gql');
     //test('schema-kitchen-sink.graphql');
   }
 
@@ -20,6 +22,11 @@ class Test
     trace(source);
 
     trace('Generating Haxe:');
-    trace(graphql.HaxeGenerator.parse(p.document));
+    var result = graphql.HaxeGenerator.parse(p.document);
+    if (result.stderr.length>0) {
+      trace('Error:\n${ result.stderr }');
+    } else {
+      trace(result.stdout);
+    }
   }
 }

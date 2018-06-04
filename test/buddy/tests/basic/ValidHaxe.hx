@@ -13,7 +13,7 @@ class ValidHaxe extends BuddySuite
       var haxe:String;
 
       it("should generate haxe code...", function() {
-        parser = new graphql.parser.Parser(BasicSchema.gql);
+        parser = new graphql.parser.Parser(BasicTypes.gql);
         var result = graphql.HaxeGenerator.parse(parser.document);
         haxe = result.stdout;
       });

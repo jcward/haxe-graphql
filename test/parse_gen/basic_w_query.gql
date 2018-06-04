@@ -1,0 +1,12 @@
+
+interface INamed {
+  name : String!
+}
+
+# A basic person type:
+type Person implements INamed & IAged { # Some comment
+  id:    ID!
+  name : String!
+  friends: [Person!]
+}
+
