@@ -1,9 +1,7 @@
-
 	schema {
 		query: Query
 		mutation: Mutation
 	}
-
 	# The query type, represents all of the entry points into our object graph
 	type Query {
 		hero(episode: Episode = NEWHOPE): Character
@@ -14,13 +12,10 @@
 		human(id: ID!): Human
 		starship(id: ID!): Starship
 	}
-
 	# The mutation type, represents all updates we can make to our data
 	type Mutation {
 		createReview(episode: Episode!, review: ReviewInput!): Review
 	}
-
-
 	# The episodes in the Star Wars trilogy
 	enum Episode {
 		# Star Wars Episode IV: A New Hope, released in 1977.
@@ -30,11 +25,6 @@
 		# Star Wars Episode VI: Return of the Jedi, released in 1983.
 		JEDI
 	}
-
-	interface IName {
-		name: String!
-  }
-
 	# A character from the Star Wars universe
 	interface Character {
 		# The ID of the character
@@ -48,7 +38,6 @@
 		# The movies this character appears in
 		appearsIn: [Episode!]!
 	}
-
 	# Units of height
 	enum LengthUnit {
 		# The standard unit around the world
@@ -56,9 +45,8 @@
 		# Primarily used in the United States
 		FOOT
 	}
-
 	# A humanoid creature from the Star Wars universe
-	type Human implements Character & IName {
+	type Human implements Character {
 		# The ID of the human
 		id: ID!
 		# What this human calls themselves
@@ -76,9 +64,8 @@
 		# A list of starships this person has piloted, or an empty list if none
 		starships: [Starship]
 	}
-
 	# An autonomous mechanical character in the Star Wars universe
-	type Droid implements Character & IName {
+	type Droid implements Character {
 		# The ID of the droid
 		id: ID!
 		# What others call this droid
@@ -92,7 +79,6 @@
 		# This droid's primary function
 		primaryFunction: String
 	}
-
 	# A connection object for a character's friends
 	type FriendsConnection {
 		# The total number of friends
@@ -104,7 +90,6 @@
 		# Information for paginating this connection
 		pageInfo: PageInfo!
 	}
-
 	# An edge object for a character's friends
 	type FriendsEdge {
 		# A cursor used for pagination
@@ -112,14 +97,12 @@
 		# The character represented by this friendship edge
 		node: Character
 	}
-
 	# Information for paginating this connection
 	type PageInfo {
 		startCursor: ID
 		endCursor: ID
 		hasNextPage: Boolean!
 	}
-
 	# Represents a review for a movie
 	type Review {
 		# The number of stars this review gave, 1-5
@@ -127,7 +110,14 @@
 		# Comment about the movie
 		commentary: String
 	}
-
+	# The input object sent when someone is creating a new review
+	scalar ReviewInput
+	### input ReviewInput {
+	###   # 0-5 stars
+	###   stars: Int!
+	###   # Comment about the movie, optional
+	###   commentary: String
+	### }
 	type Starship {
 		# The ID of the starship
 		id: ID!
@@ -136,5 +126,4 @@
 		# Length of the starship, along the longest axis
 		length(unit: LengthUnit = METER): Float!
 	}
-
 	union SearchResult = Human | Droid | Starship
