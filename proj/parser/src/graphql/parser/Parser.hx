@@ -97,7 +97,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       line_num++;
     }
     // Line number error message
-    var msg = '$_filename:$line_num: characters ${ e.pos.min-off }-${ e.pos.max-off } Error: ${ e.message }';
+    var msg = '$_filename:$line_num: characters ${ e.pos.min-off-1 }-${ e.pos.max-off-1 } Error: ${ e.message }';
     throw msg;
   }
 
