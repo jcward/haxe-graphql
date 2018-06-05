@@ -454,6 +454,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     //  typedef ObjectValueNode > fields: ReadonlyArray<ObjectFieldNode>, // name:value
 
     skipWhitespace(true);
+    var start:Int = pos;
 
     try {
       var num = parseNumeric();
@@ -471,6 +472,11 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
         return Success(cast v);
       }
 
+      if (allow('$')) {
+        var v = { var o = parseVariableNode(start); !o.isSuccess() && return o.swap(null); o.sure(); };
+        return Success(v);
+      }
+
       if (allowHere('true')) return Success(cast { kind:Kind.BOOLEAN, value:true });
       if (allowHere('false')) return Success(cast { kind:Kind.BOOLEAN, value:false });
       if (allowHere('null')) return Success(cast { kind:Kind.NULL, value:false });
@@ -482,7 +488,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       return Failure(e);
     }
 
-    return Failure(makeError('Expected value but found ${ source.get(pos) }', makePos(pos)));
+    return Failure(makeError('Expected value but found ${ String.fromCharCode(source.get(pos)) }', makePos(pos)));
   }
 
   private function parseNumeric():Null<{ value:String, is_float:Bool}>
@@ -627,6 +633,12 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Success(def);
   }
 
+  function parseVariableNode(start:Int):Outcome<VariableNode, Err> {
+    var name = { var o = parseNameNode(); !o.isSuccess() && return o.swap(null); o.sure(); };
+    var v:VariableNode = { kind:Kind.VARIABLE, name: name, loc:mkLoc(start,pos) };
+    return Success(v);
+  }
+
   function parseVariableDefinitions(): Outcome<Array<VariableDefinitionNode>, Err> {
     skipWhitespace(true);
     if (!allow('(')) return Success([]);
@@ -635,8 +647,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     function parseVariableDefinition():Outcome<VariableDefinitionNode, Err> {
       expect('$');
       var start = pos;
-      var name = { var o = parseNameNode(); !o.isSuccess() && return o.swap(null); o.sure(); };
-      var v:VariableNode = { kind:Kind.VARIABLE, name: name, loc:mkLoc(start,pos) };
+      var v = { var o = parseVariableNode(start); !o.isSuccess() && return o.swap(null); o.sure(); };
 
       var type = { var o = parseType(); !o.isSuccess() && return o.swap(null); o.sure(); };
 
@@ -660,6 +671,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       var_defs.push(vd);
       if (!allow(',')) break;
     }
+    expect(')');
     return Success(var_defs);
   }
 
@@ -713,7 +725,9 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     function parseArgument(): Outcome<ArgumentNode, Err> {
       var an:ArgumentNode = { kind:Kind.ARGUMENT, name:null, value:null };
       an.name = { var o = parseNameNode(); !o.isSuccess() && return o.swap(null); o.sure(); };
-      an.value = { var o = parseValue(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      if (allow(':')) {
+        an.value = { var o = parseValue(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      }
       return Success(an);
     }
 
