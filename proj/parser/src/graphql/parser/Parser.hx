@@ -30,7 +30,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     super(schema);
     _filename = filename;
 
-    document = switch readDocument() {
+    document = switch parseDocument() {
       case Success(d): d;
       case Failure(f):
       format_and_rethrow(f);
@@ -107,7 +107,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
      - - - - - - - - - - - -
      - - - - - - - - - - - - */
 
-  private function readDocument():Outcome<Document, Err>
+  private function parseDocument():Outcome<Document, Err>
   {
     var defs = [];
     while (true) {
@@ -136,25 +136,25 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     // See official parser, list of valid identifiers here:
     // https://github.com/graphql/graphql-js/blob/dd0297302800347a20a192624ba6373ee86836a3/src/language/parser.js#L205
     var rtn:Outcome<BaseNode, Err> = switch id.toString() {
-      case "type":      readTypeDefinition(start, Kind.OBJECT_TYPE_DEFINITION);
-      case "interface": readTypeDefinition(start, Kind.INTERFACE_TYPE_DEFINITION);
-      case "schema":    readSchemaDefinition(start);
-      case "enum":      readEnumDefinition(start);
-      case "union":     readUnionDefinition(start);
-      case "scalar":    readScalarDefinition(start);
+      case "type":      parseTypeDefinition(start, Kind.OBJECT_TYPE_DEFINITION);
+      case "interface": parseTypeDefinition(start, Kind.INTERFACE_TYPE_DEFINITION);
+      case "schema":    parseSchemaDefinition(start);
+      case "enum":      parseEnumDefinition(start);
+      case "union":     parseUnionDefinition(start);
+      case "scalar":    parseScalarDefinition(start);
       default:
         Failure(makeError('Got "${ source[start...pos] }", expecting keyword: type interface enum schema union', makePos(start)));
     }
     return rtn;
   }
 
-  private function readTypeDefinition(start:Int, kind:String):Outcome<BaseNode, Err>
+  private function parseTypeDefinition(start:Int, kind:String):Outcome<BaseNode, Err>
   {
     var def:TypeDefinitionNode = { loc:mkLoc(), kind:kind };
 
     var is_interface = def.kind==Kind.INTERFACE_TYPE_DEFINITION;
 
-    var name = readNameNode();
+    var name = parseNameNode();
     if (!name.isSuccess()) return Failure(name.getParameters()[0]);
     (cast def).name = name.sure();
     skipWhitespace(true);
@@ -166,7 +166,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     if (allow('implements')) {
       if (is_interface) return return Failure(makeError('Interfaces cannot implement interfaces.', makePos(pos)));
       parseRepeatedly(function():Void {
-        var name = readNameNode();
+        var name = parseNameNode();
         if (!name.isSuccess()) err = Failure(name.getParameters()[0]);
         var if_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:name.sure() };
         interfaces.push(if_type);
@@ -178,7 +178,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
 
     var fields = (cast def).fields = [];
     while (true) {
-      switch readFieldDefinition() {
+      switch parseFieldDefinition() {
         case Success(field): fields.push(field);
         case Failure(e): return Failure(e);
       }
@@ -199,7 +199,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     }
   }
 
-  private function readSchemaDefinition(start:Int):Outcome<SchemaDefinitionNode, Err>
+  private function parseSchemaDefinition(start:Int):Outcome<SchemaDefinitionNode, Err>
   {
     var def:SchemaDefinitionNode = { loc:mkLoc(), kind:Kind.SCHEMA_DEFINITION, operationTypes:[], directives:null };
 
@@ -212,7 +212,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
         var id = ident();
         skipWhitespace(true);
         var ntn_start = pos;
-        var ntn_out = readTypeNode();
+        var ntn_out = parseTypeNode();
         if (!ntn_out.isSuccess()) return Failure(ntn_out.getParameters()[0]);
         if (ntn_out.sure().kind!=Kind.NAMED_TYPE) return Failure(makeError('Expecting named type', makePos(ntn_start)));
         var id_s = id.sure().toString();
@@ -232,7 +232,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Success(def);
   }
 
-  private function readNameNode(skip_whitespace:Bool=true):Outcome<NameNode, Err>
+  private function parseNameNode(skip_whitespace:Bool=true):Outcome<NameNode, Err>
   {
     if (skip_whitespace) skipWhitespace(true);
     var start = pos;
@@ -245,7 +245,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     }
   }
 
-  private function readEnumDefinition(start:Int):Outcome<BaseNode, Err>
+  private function parseEnumDefinition(start:Int):Outcome<BaseNode, Err>
   {
     var def:EnumTypeDefinitionNode = {
       loc: { start:start, end:pos, source:_filename, startToken:null, endToken:null },
@@ -254,14 +254,14 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       values:[]
     };
 
-    var name = readNameNode();
+    var name = parseNameNode();
     if (!name.isSuccess()) return Failure(name.getParameters()[0]);
     def.name = name.sure();
     skipWhitespace(true);
 
     expect('{');
     while (true) {
-      var name = readNameNode();
+      var name = parseNameNode();
       if (!name.isSuccess()) return Failure(name.getParameters()[0]);
       var ev:EnumValueDefinitionNode = { kind:Kind.NAMED_TYPE, name:name.sure() };
       def.values.push(ev);
@@ -274,7 +274,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Success(def);
   }
 
-  private function readScalarDefinition(start:Int):Outcome<BaseNode, Err>
+  private function parseScalarDefinition(start:Int):Outcome<BaseNode, Err>
   {
     var def:ScalarTypeDefinitionNode = {
       loc: { start:start, end:pos, source:_filename, startToken:null, endToken:null },
@@ -282,7 +282,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       name:null
     };
     skipWhitespace(true);
-    var name = readNameNode();
+    var name = parseNameNode();
     if (!name.isSuccess()) return Failure(name.getParameters()[0]);
     def.name = name.sure();
     def.loc.end = pos;
@@ -290,7 +290,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Success(def);
   }
 
-  private function readUnionDefinition(start:Int):Outcome<BaseNode, Err>
+  private function parseUnionDefinition(start:Int):Outcome<BaseNode, Err>
   {
     var def:UnionTypeDefinitionNode = {
       loc: { start:start, end:pos, source:_filename, startToken:null, endToken:null },
@@ -298,14 +298,14 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       name:null,
       types:[]
     };
-    var name = readNameNode();
+    var name = parseNameNode();
     if (!name.isSuccess()) return Failure(name.getParameters()[0]);
     def.name = name.sure();
     skipWhitespace(true);
 
     expect('=');
     while (true) {
-      var name = readNameNode();
+      var name = parseNameNode();
       if (!name.isSuccess()) return Failure(name.getParameters()[0]);
       var u_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:name.sure() };
       def.types.push(u_type);
@@ -317,7 +317,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Success(def);
   }
 
-  private function readFieldDefinition()
+  private function parseFieldDefinition()
   {
     skipWhitespace(true);
     var def:FieldDefinitionNode = {
@@ -329,18 +329,18 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       directives:[]
     };
 
-    var name = readNameNode();
+    var name = parseNameNode();
     if (!name.isSuccess()) return Failure(name.getParameters()[0]);
     def.name = name.sure();
 
     if (allow('(')) {
-      var args = readArguments();
+      var args = parseArguments();
       if (!args.isSuccess()) return Failure(args.getParameters()[0]);
       def.arguments = args.sure();
     }
 
     skipWhitespace();
-    var type = readTypeNode();
+    var type = parseTypeNode();
     if (!type.isSuccess()) return Failure(type.getParameters()[0]);
     def.type = cast type.sure();
 
@@ -349,7 +349,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Success(def);
   }
 
-  private function readTypeNode():Outcome<graphql.TypeNode, Err>
+  private function parseTypeNode():Outcome<graphql.TypeNode, Err>
   {
     var list_wrap = false;
     var inner_not_null = false;
@@ -357,7 +357,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
 
     expect(':');
     if (allow('[')) list_wrap = true;
-    var name = readNameNode();
+    var name = parseNameNode();
     if (!name.isSuccess()) return Failure(name.getParameters()[0]);
     var named_type:NamedTypeNode = { kind:Kind.NAMED_TYPE, name:name.sure() }
     skipWhitespace();
@@ -390,7 +390,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Success(type);
   }
 
-  private function readArguments():Outcome<Array<graphql.InputValueDefinitionNode>, Err>
+  private function parseArguments():Outcome<Array<graphql.InputValueDefinitionNode>, Err>
   {
     var args = [];
 
@@ -404,12 +404,12 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
         description : null, // Null<graphql.StringValueNode>,
         defaultValue : null // Null<graphql.ValueNode>
       };
-      var name = readNameNode();
+      var name = parseNameNode();
       if (!name.isSuccess()) return Failure(name.getParameters()[0]);
       iv.name = name.sure();
 
       skipWhitespace(true);
-      var type = readTypeNode();
+      var type = parseTypeNode();
       if (!type.isSuccess()) return Failure(type.getParameters()[0]);
       iv.type = cast type.sure();
 
@@ -420,7 +420,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
 
       skipWhitespace(true);
       if (allow('=')) {
-        var dv = readValue();
+        var dv = parseValue();
         if (!dv.isSuccess()) return Failure(dv.getParameters()[0]);
         iv.defaultValue = dv.sure();
       }
@@ -440,7 +440,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
      - - - - - - - - - - - -
      - - - - - - - - - - - - */
 
-  private function readValue():Outcome<ValueNode, Err>
+  private function parseValue():Outcome<ValueNode, Err>
   {
     //  typedef IntValueNode >  value: String,
     //  typedef FloatValueNode >  value: String,
@@ -454,7 +454,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     skipWhitespace(true);
 
     try {
-      var num = readNumeric();
+      var num = parseNumeric();
       if (num!=null) {
         var v = {
           kind:num.is_float ? Kind.FLOAT : Kind.INT,
@@ -463,7 +463,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
         return Success(cast v);
       }
 
-      var str = readString();
+      var str = parseString();
       if (str!=null) {
         var v = { value:str.value, block:str.is_block };
         return Success(cast v);
@@ -474,8 +474,8 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       if (allowHere('null')) return Success(cast { kind:Kind.NULL, value:false });
       if (is(IDENT_START)) return Success(cast { kind:Kind.ENUM, value:ident(true) });
 
-      if (is('['.code)) return Success(cast { kind:Kind.LIST, values:readArrayValues() });
-      if (is('{'.code)) return Success(cast { kind:Kind.OBJECT, fields:readObjectFields() });
+      if (is('['.code)) return Success(cast { kind:Kind.LIST, values:parseArrayValues() });
+      if (is('{'.code)) return Success(cast { kind:Kind.OBJECT, fields:parseObjectFields() });
     } catch (e:Err) {
       return Failure(e);
     }
@@ -483,7 +483,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Failure(makeError('Expected value but found ${ source.get(pos) }', makePos(pos)));
   }
 
-  private function readNumeric():Null<{ value:String, is_float:Bool}>
+  private function parseNumeric():Null<{ value:String, is_float:Bool}>
   {
     // http://facebook.github.io/graphql/draft/#sec-Int-Value
     var reset = pos;
@@ -513,7 +513,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return { value:num, is_float:is_float };
   }
 
-  private function readString():Null<{ value:String, is_block:Bool}>
+  private function parseString():Null<{ value:String, is_block:Bool}>
   {
     // http://facebook.github.io/graphql/draft/#sec-String-Value
     var reset = pos;
@@ -553,13 +553,13 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return { value:str.toString(), is_block:is_block };
   }
 
-  private function readArrayValues():Array<ValueNode>
+  private function parseArrayValues():Array<ValueNode>
   {
     var values = [];
     expect('[');
     if (allow(']')) return values;
     while(true) {
-      var val = readValue();
+      var val = parseValue();
       if (!val.isSuccess()) throw makeError(val.getParameters()[0], makePos(pos));
       values.push(val.sure());
       skipWhitespace(true);
@@ -569,19 +569,19 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return values;
   }
 
-  private function readObjectFields():Array<ObjectFieldNode>
+  private function parseObjectFields():Array<ObjectFieldNode>
   {
     var fields = [];
     expect('{');
     if (allow('}')) return fields;
     while (true) {
       skipWhitespace(true);
-      var key = readString();
+      var key = parseString();
       if (key==null) throw makeError('Expecting object key', makePos(pos));
       if (key.is_block) throw makeError('Object keys don\'t support block strings', makePos(pos));
       skipWhitespace(true);
       expect(':');
-      var val = readValue();
+      var val = parseValue();
       if (!val.isSuccess()) throw makeError(val.getParameters()[0], makePos(pos));
       var nn:NameNode = { kind:Kind.NAME, value:key.value };
       var of:ObjectFieldNode = { kind:Kind.OBJECT_FIELD, name:nn, value:val.sure() };
@@ -594,7 +594,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
 
   /* - - - - - - - - - - - -
      - - - - - - - - - - - -
-     Query Parsing
+     Operation Parsing
      - - - - - - - - - - - -
      - - - - - - - - - - - - */
 
