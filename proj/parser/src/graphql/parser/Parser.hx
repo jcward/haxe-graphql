@@ -30,14 +30,64 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     super(schema);
     _filename = filename;
 
-    try {
-      document = readDocument();
-    } catch (e:Err) {
-      format_and_rethrow(_filename, this.source, e);
+    document = switch readDocument() {
+      case Success(d): d;
+      case Failure(f):
+      format_and_rethrow(f);
+      null;
+    };
+  }
+
+
+  /* - - - - - - - - - - - -
+     - - - - - - - - - - - -
+     Helpers
+     - - - - - - - - - - - -
+     - - - - - - - - - - - - */
+
+  static var COMMENT_CHAR = '#'.code;
+  static var EXP = @:privateAccess tink.parse.Filter.ofConst('e'.code) || @:privateAccess tink.parse.Filter.ofConst('E'.code);
+  static var IDENT_START = UPPER || LOWER || '_'.code;
+  static var IDENT_CONTD = IDENT_START || DIGIT;
+
+  private function ident(here = false) {
+    return 
+      if ((here && is(IDENT_START)) || (!here && upNext(IDENT_START)))
+        Success(readWhile(IDENT_CONTD));
+      else 
+        Failure(makeError('Identifier expected', makePos(pos)));  
+  }
+
+  private inline function skipWhitespace(and_comments:Bool=false) {
+    doReadWhile(WHITE);
+    if (and_comments) {
+      while (true) {
+        if (is(COMMENT_CHAR)) { upto("\n"); } else { break; }
+        doReadWhile(WHITE);
+      }
     }
   }
 
-  static function format_and_rethrow(filename:String, source:tink.parse.StringSlice, e:Err)
+  override function doSkipIgnored() skipWhitespace();
+  
+  override function doMakePos(from:Int, to:Int):Pos
+  {
+    return { file:'Untitled', min:from, max:to };
+  }
+
+  override function makeError(message:String, pos:Pos):Err
+  {
+    return { message:message, pos:pos };
+  }
+
+  function mkLoc(?start:Int, ?end:Int):Location
+  {
+    if (start==null) start = pos;
+    if (end==null) end = start;
+    return { start:start, end:end, source:_filename, startToken:null, endToken:null };
+  }
+
+  function format_and_rethrow(e:Err)
   {
     var line_num = 1;
     var off = 0;
@@ -46,13 +96,18 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       line_num++;
     }
     // Line number error message
-    var msg = '$filename:$line_num: characters ${ e.pos.min-off }-${ e.pos.max-off } Error: ${ e.message }';
+    var msg = '$_filename:$line_num: characters ${ e.pos.min-off }-${ e.pos.max-off } Error: ${ e.message }';
     throw msg;
   }
 
-  static var COMMENT_CHAR = '#'.code;
 
-  private function readDocument()
+  /* - - - - - - - - - - - -
+     - - - - - - - - - - - -
+     Schema parsing
+     - - - - - - - - - - - -
+     - - - - - - - - - - - - */
+
+  private function readDocument():Outcome<Document, Err>
   {
     var defs = [];
     while (true) {
@@ -61,28 +116,32 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       if (done()) break;
 
       switch readDefinition() {
-        case Success(d):
-          defs.push(d);
-        case Failure(f):
-          throw makeError(f.message, makePos(pos));
+        case Success(d): defs.push(d);
+        case Failure(f): return Failure(f);
       }
     }
-    return { definitions:defs };
+    return Success({ definitions:defs });
   }
 
   private function readDefinition():Outcome<BaseNode, Err>
   {
     skipWhitespace(true);
     var start = pos;
-    var rtn:Outcome<BaseNode, Err> = switch ident(true) {
-      case Success(v) if (v=="type"):      readTypeDefinition(start, Kind.OBJECT_TYPE_DEFINITION);
-      case Success(v) if (v=="interface"): readTypeDefinition(start, Kind.INTERFACE_TYPE_DEFINITION);
-      case Success(v) if (v=="schema"):    readSchemaDefinition(start);
-      case Success(v) if (v=="enum"):      readEnumDefinition(start);
-      case Success(v) if (v=="union"):     readUnionDefinition(start);
-      case Success(v) if (v=="scalar"):    readScalarDefinition(start);
-      case Success(_): Failure(makeError('Got "${ source[start...pos] }", expecting keyword: type interface enum schema union', makePos(start)));
-      case Failure(e): Failure(e);
+    if (allow('{')) {
+      throw 'TODO: call readOperationDefinition';
+    }
+
+    var id = { var o = ident(); !o.isSuccess() && return o.swap(null); o.sure(); };
+
+    var rtn:Outcome<BaseNode, Err> = switch id.toString() {
+      case "type":      readTypeDefinition(start, Kind.OBJECT_TYPE_DEFINITION);
+      case "interface": readTypeDefinition(start, Kind.INTERFACE_TYPE_DEFINITION);
+      case "schema":    readSchemaDefinition(start);
+      case "enum":      readEnumDefinition(start);
+      case "union":     readUnionDefinition(start);
+      case "scalar":    readScalarDefinition(start);
+      default:
+        Failure(makeError('Got "${ source[start...pos] }", expecting keyword: type interface enum schema union', makePos(start)));
     }
     return rtn;
   }
@@ -372,6 +431,13 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Success(args);
   }
 
+
+  /* - - - - - - - - - - - -
+     - - - - - - - - - - - -
+     Value Parsing
+     - - - - - - - - - - - -
+     - - - - - - - - - - - - */
+
   private function readValue():Outcome<ValueNode, Err>
   {
     //  typedef IntValueNode >  value: String,
@@ -385,31 +451,34 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
 
     skipWhitespace(true);
 
-    var num = readNumeric();
-    if (num!=null) {
-      var v = {
-        kind:num.is_float ? Kind.FLOAT : Kind.INT,
-        value:num.value
-      };
-      return Success(cast v);
+    try {
+      var num = readNumeric();
+      if (num!=null) {
+        var v = {
+          kind:num.is_float ? Kind.FLOAT : Kind.INT,
+          value:num.value
+        };
+        return Success(cast v);
+      }
+
+      var str = readString();
+      if (str!=null) {
+        var v = { value:str.value, block:str.is_block };
+        return Success(cast v);
+      }
+
+      if (allowHere('true')) return Success(cast { kind:Kind.BOOLEAN, value:true });
+      if (allowHere('false')) return Success(cast { kind:Kind.BOOLEAN, value:false });
+      if (allowHere('null')) return Success(cast { kind:Kind.NULL, value:false });
+      if (is(IDENT_START)) return Success(cast { kind:Kind.ENUM, value:ident(true) });
+
+      if (is('['.code)) return Success(cast { kind:Kind.LIST, values:readArrayValues() });
+      if (is('{'.code)) return Success(cast { kind:Kind.OBJECT, fields:readObjectFields() });
+    } catch (e:Err) {
+      return Failure(e);
     }
 
-    var str = readString();
-    if (str!=null) {
-      var v = { value:str.value, block:str.is_block };
-      return Success(cast v);
-    }
-
-    if (allowHere('true')) return Success(cast { kind:Kind.BOOLEAN, value:true });
-    if (allowHere('false')) return Success(cast { kind:Kind.BOOLEAN, value:false });
-    if (allowHere('null')) return Success(cast { kind:Kind.NULL, value:false });
-    if (is(IDENT_START)) return Success(cast { kind:Kind.ENUM, value:ident(true) });
-
-    if (is('['.code)) return Success(cast { kind:Kind.LIST, values:readArrayValues() });
-    if (is('{'.code)) return Success(cast { kind:Kind.OBJECT, fields:readObjectFields() });
-
-    throw makeError('Expected value but found ${ source.get(pos) }', makePos(pos));
-    return null;
+    return Failure(makeError('Expected value but found ${ source.get(pos) }', makePos(pos)));
   }
 
   private function readNumeric():Null<{ value:String, is_float:Bool}>
@@ -521,44 +590,11 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return fields;
   }
 
-  static var EXP = @:privateAccess tink.parse.Filter.ofConst('e'.code) || @:privateAccess tink.parse.Filter.ofConst('E'.code);
-  static var IDENT_START = UPPER || LOWER || '_'.code;
-  static var IDENT_CONTD = IDENT_START || DIGIT;
+  /* - - - - - - - - - - - -
+     - - - - - - - - - - - -
+     Query Parsing
+     - - - - - - - - - - - -
+     - - - - - - - - - - - - */
 
-  private function ident(here = false) {
-    return 
-      if ((here && is(IDENT_START)) || (!here && upNext(IDENT_START)))
-        Success(readWhile(IDENT_CONTD));
-      else 
-        Failure(makeError('Identifier expected', makePos(pos)));  
-  }
-
-  private inline function skipWhitespace(and_comments:Bool=false) {
-    doReadWhile(WHITE);
-    if (and_comments) {
-      while (true) {
-        if (is(COMMENT_CHAR)) { upto("\n"); } else { break; }
-        doReadWhile(WHITE);
-      }
-    }
-  }
-
-  override function doSkipIgnored() skipWhitespace();
-  
-  override function doMakePos(from:Int, to:Int):Pos
-  {
-    return { file:'Untitled', min:from, max:to };
-  }
-
-  override function makeError(message:String, pos:Pos):Err
-  {
-    return { message:message, pos:pos };
-  }
-
-  function mkLoc(?start:Int, ?end:Int):Location
-  {
-    if (start==null) start = pos;
-    if (end==null) end = start;
-    return { start:start, end:end, source:_filename, startToken:null, endToken:null };
-  }
+     
 }
