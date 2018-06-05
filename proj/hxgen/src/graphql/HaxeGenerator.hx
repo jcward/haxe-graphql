@@ -116,6 +116,9 @@ class HaxeGenerator
       case ASTDefs.Kind.UNION_TYPE_DEFINITION:
         write_union_as_haxe_abstract(def);
         newline();
+      case ASTDefs.Kind.OPERATION_DEFINITION:
+        write_operation_def_result(doc, def);
+        newline();
       case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
         // Interfaces are a no-op in the second pass
       default:
@@ -325,6 +328,36 @@ class HaxeGenerator
     }
   }
 
+  function write_operation_def_result(root:ASTDefs.Document,
+                                      def:ASTDefs.OperationDefinitionNode)
+  {
+    _stdout_writer.append('/* Operation def: */');
+
+    if (def.operation!='query') throw 'Only OperationDefinitionNodes of type query are supported...';
+    if (def.name==null || def.name.value==null) throw 'Only named queries are supported...';
+
+    _stdout_writer.append('typedef ${ def.name.value }_Result = Dynamic; /* TODO !! */');
+
+    return;
+
+    /*
+    var def_ptr = root;
+
+    for (sel_node in def.selectionSet.selections) {
+
+      switch (sel_node.kind) { // FragmentSpead | Field | InlineFragment
+        case Kind.FIELD:
+        var field_node:FieldNode = cast sel_node;
+        field_node.name.value
+        if (field_node.selectionSet==null) {
+          // At a leaf, 
+        }
+          trace('HANDLE FIELD: ${ sel_node }');
+        default: throw 'Unhandled SelectionNode kind: ${ sel_node.kind }';
+      }
+    }
+    */
+  }
 
   // Init ID type as lenient abstract over String
   // TODO: optional require toIDString() for explicit string casting

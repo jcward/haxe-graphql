@@ -7,6 +7,8 @@ class Main implements Buddy<[
                              tests.basic.Reporting,
                              tests.basic.BasicSchema,
                              tests.args.ArgsDefaultValues,
-                             tests.operations.ParseQuery,
+                             tests.operations.BasicQuery,
+                             tests.operations.ArgsQuery,
+                             tests.operations.UnnamedQuery,
                              tests.star_wars.StarWarsTest
 ]> {}
