@@ -287,17 +287,6 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     skipWhitespace(true);
     return Success(def);
   }
-  //function kwd(name:String) {
-  //  var pos = pos;
-  //  
-  //  var found = switch ident(true) {
-  //    case Success(v) if (v == name): true;
-  //    default: false;
-  //  }
-  //  
-  //  if (!found) this.pos = pos;
-  //  return found;
-  //}
 
   private function readTypeNode():Outcome<graphql.TypeNode, Err>
   {
@@ -531,9 +520,6 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     }
     return fields;
   }
-
-  @:generic
-  private inline function fail<S>(msg:String):Outcome<S,Err> return Failure(makeError(msg, makePos(pos)));
 
   static var EXP = @:privateAccess tink.parse.Filter.ofConst('e'.code) || @:privateAccess tink.parse.Filter.ofConst('E'.code);
   static var IDENT_START = UPPER || LOWER || '_'.code;
