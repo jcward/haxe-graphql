@@ -133,6 +133,8 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
 
     var id = { var o = ident(); !o.isSuccess() && return o.swap(null); o.sure(); };
 
+    // See official parser, list of valid identifiers here:
+    // https://github.com/graphql/graphql-js/blob/dd0297302800347a20a192624ba6373ee86836a3/src/language/parser.js#L205
     var rtn:Outcome<BaseNode, Err> = switch id.toString() {
       case "type":      readTypeDefinition(start, Kind.OBJECT_TYPE_DEFINITION);
       case "interface": readTypeDefinition(start, Kind.INTERFACE_TYPE_DEFINITION);
@@ -215,7 +217,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
         if (ntn_out.sure().kind!=Kind.NAMED_TYPE) return Failure(makeError('Expecting named type', makePos(ntn_start)));
         var id_s = id.sure().toString();
         switch id_s {
-          case "query" | "mutation" | "subscription":
+          case "query" | "mutation": //  | "subscription": Apparently subscription is experimental / non-spec
             var n:OperationTypeDefinitionNode = { kind:Kind.OPERATION_TYPE_DEFINITION, operation:id_s, type:ntn_out.sure() };
             def.operationTypes.push(n);
           default: return Failure(makeError('Unknown operation type ${ id_s }', makePos(loc_start)));
