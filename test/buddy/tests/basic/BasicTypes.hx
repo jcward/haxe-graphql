@@ -40,7 +40,7 @@ type Dog implements INamed {
       var parser:graphql.parser.Parser;
       var haxe:String;
 
-      beforeAll(function() {
+      it('should parse the document without error', {
         parser = new graphql.parser.Parser(gql);
         var result = graphql.HaxeGenerator.parse(parser.document);
         haxe = result.stdout;
