@@ -6,5 +6,6 @@ class Main implements Buddy<[
                              tests.basic.ValidHaxe,
                              tests.basic.BasicSchema,
                              tests.args.ArgsDefaultValues,
+                             tests.operations.ParseQuery,
                              tests.star_wars.StarWarsTest
 ]> {}

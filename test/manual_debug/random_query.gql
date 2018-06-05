@@ -1,0 +1,12 @@
+{
+  title
+  id
+  course_id
+  content {
+    id
+  }
+  unlock_at
+  submissions {
+    id
+  }
+}

@@ -1,0 +1,21 @@
+schema {
+  query: Query
+}
+
+type Query {
+  by_id(id: ID!): SomeType
+}
+
+type SomeType {
+  id:ID!
+  name:String!
+  otherData: Int
+}
+
+# A query:
+{
+  by_id {
+    id
+    name
+  }
+}

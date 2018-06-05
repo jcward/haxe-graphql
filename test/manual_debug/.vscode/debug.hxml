@@ -1,0 +1,17 @@
+# Parser
+../../proj/parser/depends.hxml
+-cp ../../proj/parser/src
+
+# Generator
+-cp ../../proj/hxgen/src
+
+# AST / Utils
+-cp ../../proj/ast/src
+-cp ../../proj/utils/src
+
+# Test
+-debug
+-cp .
+-D source-map-content
+-main Test
+-js test.js

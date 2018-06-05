@@ -4,24 +4,34 @@ class Test
 {
   public static function main()
   {
-    test('StarWarsTest.gql');
+    // test('query.gql');
+    // test('StarWarsTest.gql');
     // test('basic_schema.gql');
     // test('basic_types.gql');
     // test('args_no_values.gql');
     // test('arguments.gql');
-    //test('schema-kitchen-sink.graphql');
-  }
+    // test('schema-kitchen-sink.graphql');
+    // var source = sys.io.File.getContent(fn);
 
-  private static function test(fn)
-  {
     trace('============================================================');
     trace('============================================================');
     trace('============================================================');
-    trace('=== Loading from: ${ fn }');
+    trace('Using literal source...');
     trace('============================================================');
     trace('============================================================');
     trace('============================================================');
-    var source = sys.io.File.getContent(fn);
+
+    var source = '
+
+query GetReturnOfTheJedi($$id: ID) {
+  film(id: $$id) {
+    title
+    director
+    releaseDate
+  }
+}
+
+';
 
     var p = new graphql.parser.Parser(source);
     trace(source);

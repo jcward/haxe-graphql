@@ -12,4 +12,5 @@
 # Test
 -debug
 -cp .
+-D source-map-content
 -x Test

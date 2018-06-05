@@ -50,12 +50,13 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   static var IDENT_START = UPPER || LOWER || '_'.code;
   static var IDENT_CONTD = IDENT_START || DIGIT;
 
-  private function ident(here = false) {
+  private function ident(error_msg:String='Identifier expected') {
+    var here = false;
     return 
       if ((here && is(IDENT_START)) || (!here && upNext(IDENT_START)))
         Success(readWhile(IDENT_CONTD));
       else 
-        Failure(makeError('Identifier expected', makePos(pos)));  
+        Failure(makeError(error_msg, makePos(pos)));  
   }
 
   private inline function skipWhitespace(and_comments:Bool=false) {
@@ -127,10 +128,10 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
   {
     skipWhitespace(true);
     var start = pos;
-    if (allow('{')) {
-      throw 'TODO: call readOperationDefinition';
-    }
 
+    if (is('{'.code)) {
+      return parseOperationDefinition(start, 'query');
+    }
     var id = { var o = ident(); !o.isSuccess() && return o.swap(null); o.sure(); };
 
     // See official parser, list of valid identifiers here:
@@ -142,6 +143,9 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       case "enum":      parseEnumDefinition(start);
       case "union":     parseUnionDefinition(start);
       case "scalar":    parseScalarDefinition(start);
+
+      case "query" | "mutation":     parseOperationDefinition(start, id);
+
       default:
         Failure(makeError('Got "${ source[start...pos] }", expecting keyword: type interface enum schema union', makePos(start)));
     }
@@ -212,7 +216,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
         var id = ident();
         skipWhitespace(true);
         var ntn_start = pos;
-        var ntn_out = parseTypeNode();
+        var ntn_out = parseType();
         if (!ntn_out.isSuccess()) return Failure(ntn_out.getParameters()[0]);
         if (ntn_out.sure().kind!=Kind.NAMED_TYPE) return Failure(makeError('Expecting named type', makePos(ntn_start)));
         var id_s = id.sure().toString();
@@ -334,13 +338,13 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     def.name = name.sure();
 
     if (allow('(')) {
-      var args = parseArguments();
+      var args = parseArgumentDefs();
       if (!args.isSuccess()) return Failure(args.getParameters()[0]);
       def.arguments = args.sure();
     }
 
     skipWhitespace();
-    var type = parseTypeNode();
+    var type = parseType();
     if (!type.isSuccess()) return Failure(type.getParameters()[0]);
     def.type = cast type.sure();
 
@@ -349,7 +353,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Success(def);
   }
 
-  private function parseTypeNode():Outcome<graphql.TypeNode, Err>
+  private function parseType():Outcome<graphql.TypeNode, Err>
   {
     var list_wrap = false;
     var inner_not_null = false;
@@ -390,7 +394,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     return Success(type);
   }
 
-  private function parseArguments():Outcome<Array<graphql.InputValueDefinitionNode>, Err>
+  private function parseArgumentDefs():Outcome<Array<graphql.InputValueDefinitionNode>, Err>
   {
     var args = [];
 
@@ -409,7 +413,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       iv.name = name.sure();
 
       skipWhitespace(true);
-      var type = parseTypeNode();
+      var type = parseType();
       if (!type.isSuccess()) return Failure(type.getParameters()[0]);
       iv.type = cast type.sure();
 
@@ -420,9 +424,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
 
       skipWhitespace(true);
       if (allow('=')) {
-        var dv = parseValue();
-        if (!dv.isSuccess()) return Failure(dv.getParameters()[0]);
-        iv.defaultValue = dv.sure();
+        iv.defaultValue = { var o = parseValue(); !o.isSuccess() && return o.swap(null); o.sure(); };
       }
 
       skipWhitespace(true);
@@ -472,7 +474,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       if (allowHere('true')) return Success(cast { kind:Kind.BOOLEAN, value:true });
       if (allowHere('false')) return Success(cast { kind:Kind.BOOLEAN, value:false });
       if (allowHere('null')) return Success(cast { kind:Kind.NULL, value:false });
-      if (is(IDENT_START)) return Success(cast { kind:Kind.ENUM, value:ident(true) });
+      if (is(IDENT_START)) return Success(cast { kind:Kind.ENUM, value:ident() });
 
       if (is('['.code)) return Success(cast { kind:Kind.LIST, values:parseArrayValues() });
       if (is('{'.code)) return Success(cast { kind:Kind.OBJECT, fields:parseObjectFields() });
@@ -598,5 +600,130 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
      - - - - - - - - - - - -
      - - - - - - - - - - - - */
 
-     
+  private function parseOperationDefinition(start:Int, operation:String): Outcome<OperationDefinitionNode, Err>
+  {
+    var def:OperationDefinitionNode = {
+      kind:Kind.OPERATION_DEFINITION,
+      operation:operation,
+      name:null,
+      variableDefinitions:null,
+      directives:[],
+      selectionSet:null,
+      loc:mkLoc(pos)
+    };
+
+    skipWhitespace(true);
+
+    if (!is('{'.code)) { // named query
+      def.name = { var o = parseNameNode(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      var vds = { var o = parseVariableDefinitions(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      def.variableDefinitions = vds;
+      // TODO: def.directives = parseDirectives
+    }
+    expect('{');
+
+    def.selectionSet = { var o = parseSelectionSet(); !o.isSuccess() && return o.swap(null); o.sure(); };
+
+    return Success(def);
+  }
+
+  function parseVariableDefinitions(): Outcome<Array<VariableDefinitionNode>, Err> {
+    skipWhitespace(true);
+    if (!allow('(')) return Success([]);
+
+    // Unscoped: not called from anywhere else
+    function parseVariableDefinition():Outcome<VariableDefinitionNode, Err> {
+      expect('$');
+      var start = pos;
+      var name = { var o = parseNameNode(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      var v:VariableNode = { kind:Kind.VARIABLE, name: name, loc:mkLoc(start,pos) };
+
+      var type = { var o = parseType(); !o.isSuccess() && return o.swap(null); o.sure(); };
+
+      var vd:VariableDefinitionNode = {
+        kind:Kind.VARIABLE_DEFINITION,
+        type:type,
+        variable:v,
+        loc:null
+      }
+
+      if (allow('=')) {
+        vd.defaultValue = { var o = parseValue(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      }
+
+      return Success(vd);
+    }
+
+    var var_defs = [];
+    while (true) {
+      var vd = { var o = parseVariableDefinition(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      var_defs.push(vd);
+      if (!allow(',')) break;
+    }
+    return Success(var_defs);
+  }
+
+  function parseSelectionSet(): Outcome<SelectionSetNode, Err> {
+    skipWhitespace(true);
+    var start_ss = pos;
+
+    // Unscoped: not called from anywhere else
+    //   selection == FragmentSpead | Field | InlineFragment
+    // https://github.com/graphql/graphql-js/blob/dd0297302800347a20a192624ba6373ee86836a3/src/language/parser.js#L337-L347
+    function parseSelection():Outcome<FieldNode, Err>
+    {
+      if (allow('...')) throw 'TODO: return parseFragment';
+
+      var start = pos;
+      var name = { var o = parseNameNode(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      var alias = null;
+      if (allow(':')) {
+        alias = name;
+        name = { var o = parseNameNode(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      }
+
+      var f:FieldNode = { kind:Kind.FIELD, name:name, loc:mkLoc(start) };
+      f.arguments = { var o = parseArguments(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      f.directives = []; // TODO: directives
+      if (allow('{')) {
+        f.selectionSet = { var o = parseSelectionSet(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      }
+
+      f.loc.end = pos;
+      return Success(f);
+    }
+
+    var sset = [];
+    while (true) {
+      skipWhitespace(true);
+      var sel = { var o = parseSelection(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      sset.push(sel);
+      if (allow('}')) break;
+    }
+
+    var ssnode = { kind:Kind.SELECTION_SET, selections:sset, loc:mkLoc(start_ss, pos) };
+    return Success(ssnode);
+  }
+
+  function parseArguments(): Outcome<Array<ArgumentNode>, Err> {
+    skipWhitespace(true);
+    if (!allow('(')) return Success([]);
+
+    // Unscoped
+    function parseArgument(): Outcome<ArgumentNode, Err> {
+      var an:ArgumentNode = { kind:Kind.ARGUMENT, name:null, value:null };
+      an.name = { var o = parseNameNode(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      an.value = { var o = parseValue(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      return Success(an);
+    }
+
+    var args = [];
+    while (true) {
+      var an = { var o = parseArgument(); !o.isSuccess() && return o.swap(null); o.sure(); };
+      args.push(an);
+      if (allow(')')) break;
+    }
+
+    return Success(args);
+  }
 }
