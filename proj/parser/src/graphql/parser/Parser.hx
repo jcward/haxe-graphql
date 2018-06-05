@@ -7,7 +7,18 @@ import tink.parse.Char.*;
 
 using tink.CoreApi;
 
-using graphql.parser.ParserHelper;
+@:structInit
+class Pos {
+  public var file:String;
+  public var min:Int;
+  public var max:Int;
+}
+
+@:structInit
+class Err {
+  public var message:String;
+  public var pos:Pos;
+}
 
 class Parser extends tink.parse.ParserBase<Pos, Err>
 {
@@ -22,13 +33,24 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     try {
       document = readDocument();
     } catch (e:Err) {
-      format_and_rethrow(e);
+      format_and_rethrow(_filename, this.source, e);
     }
   }
 
-  override function doSkipIgnored() skipWhitespace();  
-  override function doMakePos(from:Int, to:Int):Pos return { file:_filename, min:from, max:to };
-  override function makeError(message:String, pos:Pos):Err return { message:message, pos:pos };
+  static function format_and_rethrow(filename:String, source:tink.parse.StringSlice, e:Err)
+  {
+    var line_num = 1;
+    var off = 0;
+    for (i in 0...e.pos.min) if (source.fastGet(i)=="\n".code) {
+      off = i;
+      line_num++;
+    }
+    // Line number error message
+    var msg = '$filename:$line_num: characters ${ e.pos.min-off }-${ e.pos.max-off } Error: ${ e.message }';
+    throw msg;
+  }
+
+  static var COMMENT_CHAR = '#'.code;
 
   private function readDocument()
   {
@@ -124,7 +146,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     expect('{');
     skipWhitespace(true);
     while (true) {
-      if (is(IDENT_START())) {
+      if (is(IDENT_START)) {
         var loc_start = pos;
         var id = ident();
         skipWhitespace(true);
@@ -265,6 +287,17 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     skipWhitespace(true);
     return Success(def);
   }
+  //function kwd(name:String) {
+  //  var pos = pos;
+  //  
+  //  var found = switch ident(true) {
+  //    case Success(v) if (v == name): true;
+  //    default: false;
+  //  }
+  //  
+  //  if (!found) this.pos = pos;
+  //  return found;
+  //}
 
   private function readTypeNode():Outcome<graphql.TypeNode, Err>
   {
@@ -381,7 +414,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     if (allowHere('true')) return Success(cast { kind:Kind.BOOLEAN, value:true });
     if (allowHere('false')) return Success(cast { kind:Kind.BOOLEAN, value:false });
     if (allowHere('null')) return Success(cast { kind:Kind.NULL, value:false });
-    if (is(IDENT_START())) return Success(cast { kind:Kind.ENUM, value:ident(true) });
+    if (is(IDENT_START)) return Success(cast { kind:Kind.ENUM, value:ident(true) });
 
     if (is('['.code)) return Success(cast { kind:Kind.LIST, values:readArrayValues() });
     if (is('{'.code)) return Success(cast { kind:Kind.OBJECT, fields:readObjectFields() });
@@ -408,7 +441,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       num += '.';
       num += readWhile(DIGIT);
     }
-    var exp = is(EXP()) ? 'e' : null;
+    var exp = is(EXP) ? 'e' : null;
     if (exp!=null) {
       is_float = true;
       num += 'e'; pos++;
@@ -497,5 +530,49 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
       expect(',');
     }
     return fields;
+  }
+
+  @:generic
+  private inline function fail<S>(msg:String):Outcome<S,Err> return Failure(makeError(msg, makePos(pos)));
+
+  static var EXP = @:privateAccess tink.parse.Filter.ofConst('e'.code) || @:privateAccess tink.parse.Filter.ofConst('E'.code);
+  static var IDENT_START = UPPER || LOWER || '_'.code;
+  static var IDENT_CONTD = IDENT_START || DIGIT;
+
+  private function ident(here = false) {
+    return 
+      if ((here && is(IDENT_START)) || (!here && upNext(IDENT_START)))
+        Success(readWhile(IDENT_CONTD));
+      else 
+        Failure(makeError('Identifier expected', makePos(pos)));  
+  }
+
+  private inline function skipWhitespace(and_comments:Bool=false) {
+    doReadWhile(WHITE);
+    if (and_comments) {
+      while (true) {
+        if (is(COMMENT_CHAR)) { upto("\n"); } else { break; }
+        doReadWhile(WHITE);
+      }
+    }
+  }
+
+  override function doSkipIgnored() skipWhitespace();
+  
+  override function doMakePos(from:Int, to:Int):Pos
+  {
+    return { file:'Untitled', min:from, max:to };
+  }
+
+  override function makeError(message:String, pos:Pos):Err
+  {
+    return { message:message, pos:pos };
+  }
+
+  function mkLoc(?start:Int, ?end:Int):Location
+  {
+    if (start==null) start = pos;
+    if (end==null) end = start;
+    return { start:start, end:end, source:_filename, startToken:null, endToken:null };
   }
 }
