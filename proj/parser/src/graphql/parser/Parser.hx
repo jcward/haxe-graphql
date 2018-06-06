@@ -22,7 +22,7 @@ class Err {
 
 class Parser extends tink.parse.ParserBase<Pos, Err>
 {
-  public var document(default,null):Document;
+  public var document(default,null):DocumentNode;
   private var _filename:String;
 
   public function new(schema:String, filename:String='Untitled')
@@ -108,7 +108,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
      - - - - - - - - - - - -
      - - - - - - - - - - - - */
 
-  private function parseDocument():Outcome<Document, Err>
+  private function parseDocument():Outcome<DocumentNode, Err>
   {
     var defs = [];
     while (true) {
@@ -121,7 +121,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
         case Failure(f): return Failure(f);
       }
     }
-    return Success({ definitions:defs });
+    return Success({ kind:Kind.DOCUMENT, definitions:defs });
   }
 
   private function readDefinition():Outcome<BaseNode, Err>

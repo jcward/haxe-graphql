@@ -7,7 +7,6 @@ typedef TODO = Dynamic;
 typedef ReadonlyArray<T> = Array<T>;
 
 // TODO / TBD
-typedef Document = { definitions:Array<TODO> }
 typedef TokenKindEnum = String;
 typedef Source = Dynamic;
 typedef OperationTypeNode = Dynamic;

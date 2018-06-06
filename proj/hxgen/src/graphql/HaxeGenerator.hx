@@ -3,6 +3,8 @@ package graphql;
 import graphql.ASTDefs;
 import haxe.ds.Either;
 
+using Lambda;
+
 @:enum abstract GenerateOption(String) {
   var TYPEDEFS = 'typedefs';
   var CLASSES = 'classes';
@@ -13,8 +15,15 @@ typedef HxGenOptions = {
   ?disable_null_wrappers:Bool
 }
 
+typedef SchemaMap = {
+  query_type:String,
+  mutation_type:String
+}
+
 // key String is field_name
 typedef InterfaceType = haxe.ds.StringMap<TypeStringifier>;
+
+typedef SomeNamedNode = { kind:String, name:NameNode };
 
 @:expose
 class HaxeGenerator
@@ -24,7 +33,7 @@ class HaxeGenerator
   private var _interfaces = new ArrayStringMap<InterfaceType>();
   private var _options:HxGenOptions;
 
-  public static function parse(doc:Document,
+  public static function parse(doc:DocumentNode,
                                ?options:HxGenOptions,
                                throw_on_error=true):{ stdout:String, stderr:String }
   {
@@ -76,13 +85,15 @@ class HaxeGenerator
   }
 
   // Parse a graphQL AST document, generating Haxe code
-  private function parse_document(doc:Document) {
+  private function parse_document(doc:DocumentNode) {
     // Parse definitions
     init_base_types();
 
     function newline() _stdout_writer.append('');
 
-    // First pass: parse interfaces only
+    var root_schema:SchemaMap = null;
+
+    // First pass: parse interfaces and schema def only
     // - when outputing typedefs, types will "> extend" interfaces, removing duplicate fields
     // - TODO: is this proper behavior? Or can type field be a super-set of the interface field?
     //         see spec: http://facebook.github.io/graphql/October2016/#sec-Object-type-validation
@@ -91,9 +102,14 @@ class HaxeGenerator
     for (def in doc.definitions) {
       switch (def.kind) {
         case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
-        var args = write_interface_as_haxe_base_typedef(def);
-        newline();
-        handle_args([get_def_name(def)], args);
+          var args = write_interface_as_haxe_base_typedef(cast def);
+          newline();
+          handle_args([get_def_name(cast def)], args);
+        case ASTDefs.Kind.SCHEMA_DEFINITION:
+          if (root_schema!=null) error('Error: cannot specify two schema definitions');
+          root_schema = write_schema_def(cast def);
+          newline();
+        case _:
       }
     }
 
@@ -101,30 +117,36 @@ class HaxeGenerator
     for (def in doc.definitions) {
       switch (def.kind) {
       case ASTDefs.Kind.SCHEMA_DEFINITION:
-        write_schema_def(def);
-        newline();
+        // null op, handled above
       case ASTDefs.Kind.SCALAR_TYPE_DEFINITION:
-        write_haxe_scalar(def);
+        write_haxe_scalar(cast def);
         newline();
       case ASTDefs.Kind.ENUM_TYPE_DEFINITION:
-        write_haxe_enum(def);
+        write_haxe_enum(cast def);
         newline();
       case ASTDefs.Kind.OBJECT_TYPE_DEFINITION:
-        var args = write_haxe_typedef(def);
+        var args = write_haxe_typedef(cast def);
         newline();
-        handle_args([get_def_name(def)], args);
+        handle_args([get_def_name(cast def)], args);
       case ASTDefs.Kind.UNION_TYPE_DEFINITION:
-        write_union_as_haxe_abstract(def);
+        write_union_as_haxe_abstract(cast def);
         newline();
       case ASTDefs.Kind.OPERATION_DEFINITION:
-        write_operation_def_result(doc, def);
-        newline();
+        // No-op, still generating type map
       case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
         // Interfaces are a no-op in the second pass
       default:
-        var name = def.name ? (' - '+def.name.value) : '';
+        var name = (cast def).name!=null ? (' - '+(cast def).name.value) : '';
         error('Error: unknown / unsupported definition kind: '+def.kind+name);
       }
+    }
+
+    // Third pass: write operation results
+    for (def in doc.definitions) switch def.kind {
+      case ASTDefs.Kind.OPERATION_DEFINITION:
+        write_operation_def_result(root_schema, doc, cast def);
+        newline();
+      default:
     }
 
     return {
@@ -145,8 +167,10 @@ class HaxeGenerator
   }
 
   private var defined_types = [];
-  function type_defined(name) {
+  private var type_map = new ArrayStringMap<{ name:String, ?fields:ArrayStringMap<TypeStringifier> }>();
+  function type_defined(name:String, fields:ArrayStringMap<TypeStringifier>=null) {
     if (defined_types.indexOf(name)<0) defined_types.push(name);
+    type_map[name] = { name:name, fields:fields };
   }
 
   function parse_type(type:ASTDefs.TypeNode, parent:ASTDefs.TypeNode=null):TypeStringifier {
@@ -219,11 +243,14 @@ class HaxeGenerator
       }
     }
 
-    type_defined(def.name.value);
+    var fields = new ArrayStringMap<TypeStringifier>();
+    type_defined(def.name.value, fields);
+
     for (field in def.fields) {
       // if (field.name.value=='id') debugger;
       var type = parse_type(field.type);
       var field_name = field.name.value;
+      fields[field_name] = type.clone().follow();
 
       if (field.arguments!=null && field.arguments.length>0) {
         args.push({ field:field_name, arguments:field.arguments });
@@ -315,48 +342,201 @@ class HaxeGenerator
   }
 
   // A schema definition is just a mapping / typedef alias to specific types
-  function write_schema_def(def:ASTDefs.SchemaDefinitionNode) {
+  function write_schema_def(def:ASTDefs.SchemaDefinitionNode):SchemaMap {
+    var rtn = { query_type:null, mutation_type:null };
+
     _stdout_writer.append('/* Schema: */');
     for (ot in def.operationTypes) {
       var op = Std.string(ot.operation);
       switch op {
-        case "query" | "mutation" | "subscription":
+        case "query" | "mutation": //  | "subscription": is "non-spec experiment"
         var capitalized = op.substr(0,1).toUpperCase() + op.substr(1);
         _stdout_writer.append('typedef Schema${ capitalized }Type = ${ ot.type.name.value };');
+        if (op=="query") rtn.query_type = ot.type.name.value;
+        if (op=="mutation") rtn.mutation_type = ot.type.name.value;
         default: throw 'Unexpected schema operation: ${ op }';
       }
     }
+
+    return rtn;
   }
 
-  function write_operation_def_result(root:ASTDefs.Document,
-                                      def:ASTDefs.OperationDefinitionNode)
+  //function get_obj_of(named_things:Array<Dynamic>, find_name:String, parent_name:String=null) {
+  //  for (thing in named_things) {
+  //    if (thing.name!=null && thing.name.value==find_name) {
+  //      return thing;
+  //    }
+  //  }
+  //  throw 'Didn\'t find a ${ find_name } inside ${ parent_name }';
+  //  return null;
+  //}
+//
+  //function resolve_type_path(names:Array<String>, at:SomeNamedNode, root:SomeNamedNode, throw_node=false):String
+  //{
+  //  function expect_descent(parent, named_things) {
+  //    var parent_name = parent.name==null ? 'Unknown' : parent.name.value;
+  //    if (names.length==0) {
+  //      if (throw_node) {
+  //        throw parent;
+  //      } else {
+  //        throw 'Found type node ${ parent_name } but GraphQL requires specifying leaf types.';
+  //      }
+  //    }
+  //    var next_root = get_obj_of(named_things, names[0], parent_name);
+  //    var next_names = names.slice(1);
+//
+  //    if (next_names.length==0 &&
+  //        (next_root.kind==Kind.SCALAR_TYPE_DEFINITION ||
+  //        (next_root.kind==Kind.ENUM_TYPE_DEFINITION))) return next_root.name.value;
+//
+  //    var last_next_root = next_root;
+  //    if (next_root.fields==null) {
+  //      // Need name (could be wrapper in non-null and/or list)
+  //      var name:NameNode = next_root.type.name;
+  //      if (name==null) name = next_root.type.type.name;
+  //      if (name==null) name = next_root.type.type.type.name;
+  //      if (name==null) name = next_root.type.type.type.type.name;
+  //      next_names.unshift(name.value);
+  //      next_root = cast root;
+  //    }
+  //    return resolve_type_path(next_names, next_root, root, throw_node);
+  //  }
+//
+  //  if (names.length==1) switch names[0] {
+  //    case a if (a=='String' || a=='Int' || a=='ID' || a=='Boolean' || a=='Float'):
+  //    return a;
+  //  }
+//
+  //  return switch at.kind {
+  //    case ASTDefs.Kind.SCALAR_TYPE_DEFINITION | ASTDefs.Kind.ENUM_TYPE_DEFINITION | ASTDefs.Kind.UNION_TYPE_DEFINITION:
+  //      if (names.length>0) throw 'Cannot descend [${ names.join(",") }] into ${ at.kind }';
+  //      at.name.value;
+  //    case ASTDefs.Kind.OBJECT_TYPE_DEFINITION:    expect_descent(at, (cast at).fields);
+  //    case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION: expect_descent(at, (cast at).fields);
+  //    case ASTDefs.Kind.DOCUMENT:                  expect_descent(at, (cast at).definitions);
+  //    case _:
+  //      throw 'Hmm, does resolve_type_path expect ${ at.kind } ???';
+  //  }
+  //}
+
+  function resolve_type_path(path:Array<String>):ResolvedTypePath
+  {
+    var ptr:{ name:String, ?fields:ArrayStringMap<TypeStringifier> } = null;
+
+    function array_inner_type(ts:TypeStringifier):String return switch ts.child {
+      case Left(cts): cts.toString();
+      default: null;
+    } 
+
+    var orig_path = path.join('.');
+    var last_ts = null;
+    while (path.length>0) {
+      var name = path.shift();
+      if (ptr==null) {
+        ptr = type_map.get(name);
+        if (ptr==null) throw 'Didn\'t find root type ${ name }';
+      } else {
+        if (ptr.fields==null) throw 'Expecting ${ ptr.name } to have fields --> ${ name }!';
+        var ts = ptr.fields.get(name);
+        if (ts==null) throw 'Expecting ${ ptr.name } to have field ${ name }!';
+        ts = ts.follow();
+        last_ts = ts;
+        if (path.length==0) break;
+        var nm:String = ts.child;
+        if (ts.prefix.indexOf('Array')>=0) nm = array_inner_type(ts);
+        if (nm==null) throw 'Expecting ts to have a name child -- is that not right?';
+        ptr = type_map.get(nm);
+        if (ptr==null) throw 'Didn\'t find expected root type ${ nm }';
+      }
+    }
+
+    // trace('Looking for ${ orig_path }, last_ts was ${ last_ts }');
+
+    var is_list = last_ts.prefix.indexOf('Array')>=0;
+    var is_opt = last_ts.optional;
+    var type_string:String = is_list ? array_inner_type(last_ts) : last_ts.toString();
+
+    var resolved = type_map[type_string];
+    if (resolved==null) throw 'Resolved ${ orig_path } to unknown type ${ type_string }';
+    if (resolved.fields==null) {
+      return LEAF(type_string, is_opt);
+    } else {
+      return TYPE(type_string, is_opt, is_list);
+    }
+  }
+
+  function write_operation_def_result(root_schema:SchemaMap,
+                                      root:ASTDefs.DocumentNode,
+                                      def:ASTDefs.OperationDefinitionNode):Void
   {
     _stdout_writer.append('/* Operation def: */');
 
     if (def.operation!='query') throw 'Only OperationDefinitionNodes of type query are supported...';
     if (def.name==null || def.name.value==null) throw 'Only named queries are supported...';
 
-    _stdout_writer.append('typedef ${ def.name.value }_Result = Dynamic; /* TODO !! */');
+    var op_name = def.name.value;
+    // _stdout_writer.append('typedef ${ op_name }_Result = Dynamic; /* TODO !! */');
 
-    return;
+    var types:haxe.DynamicAccess<Dynamic> = {};
 
-    /*
-    var def_ptr = root;
+    // trace('HI');
+    // trace('Resolve_scalar: Query: '+resolve_type_path(['Query', 'hero', 'name']));
+    // trace('Resolve_scalar: Query: '+resolve_type_path(['Query', 'hero', 'id']));
+    // trace('Resolve_scalar: Query: '+resolve_type_path(['Query', 'hero', 'born']));
+    // // Throws, as expected -- must specify sub-fields of friends (Character)
+    // trace('Resolve_scalar: Query: '+resolve_type_path(['Query', 'hero', 'friends']));
+    // trace('Resolve_scalar: Query: '+resolve_type_path(['Query', 'hero', 'friends', 'name']));
 
-    for (sel_node in def.selectionSet.selections) {
 
-      switch (sel_node.kind) { // FragmentSpead | Field | InlineFragment
-        case Kind.FIELD:
-        var field_node:FieldNode = cast sel_node;
-        field_node.name.value
-        if (field_node.selectionSet==null) {
-          // At a leaf, 
+    function handle_selection_set(sel_set:{ selections:Array<SelectionNode> },
+                                  type_path:Array<String>, // always abs
+                                  indent=1) {
+      if (sel_set==null || sel_set.selections==null) {
+        // Nothing left to do...
+      }
+ 
+      var ind:String = '';
+      for (i in 0...indent) ind += '  ';
+
+      // Always resolve names from root?
+      //var base_type:String = resolve_type_path(names, cast root);
+      for (sel_node in sel_set.selections) {
+        switch (sel_node.kind) { // FragmentSpead | Field | InlineFragment
+          case Kind.FIELD:
+            var field_node:FieldNode = cast sel_node;
+
+            var name:String = field_node.name.value;
+            var alias:String = field_node.alias==null ? name : field_node.alias.value;
+
+            var next_type_path = type_path.slice(0);
+            next_type_path.push(name);
+            switch resolve_type_path(next_type_path) {
+              case ROOT: throw 'Type path ${ type_path.join(",") } in query ${ op_name } should not resolve to root!';
+              case LEAF(str, opt):
+                if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
+                var prefix = ind + (opt ? "?" : "");
+                _stdout_writer.append('${ prefix }${ alias }:${ str },');
+              case TYPE(str, opt, list):
+                if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
+                var prefix = ind + (opt ? "?" : "");
+                var suffix1 = (list ? 'Array<{' : '{') + ' /* subset of ${ str } */';
+                var suffix2 = (list ? '}>' : '}');
+                _stdout_writer.append('$prefix$alias:$suffix1');
+                handle_selection_set(field_node.selectionSet, [ str ], indent+1);
+                _stdout_writer.append('$ind$suffix2');
+            }
+
+          default: throw 'Unhandled SelectionNode kind: ${ sel_node.kind } (TODO: FragmentSpread InlineFragment)';
         }
-          trace('HANDLE FIELD: ${ sel_node }');
-        default: throw 'Unhandled SelectionNode kind: ${ sel_node.kind }';
       }
     }
-    */
+ 
+    var query_root_name = (root_schema==null || root_schema.query_type==null) ? 'Query' : root_schema.query_type;
+    // var query_root = get_obj_of(root.definitions, query_root, 'Document');
+
+    _stdout_writer.append('typedef QueryResult_${ op_name } = {');
+    handle_selection_set(def.selectionSet, [ query_root_name ]);
+    _stdout_writer.append('}');
   }
 
   // Init ID type as lenient abstract over String
@@ -382,6 +562,12 @@ class HaxeGenerator
     _stdout_writer.append('/* - - - - - - - - - - - - - - - - - - - - - - - - - */\n\n');
   }
 
+}
+
+enum ResolvedTypePath {
+  ROOT;
+  LEAF(str:String, optional:Bool);
+  TYPE(str:String, optional:Bool, is_list:Bool);
 }
 
 class StringWriter
@@ -449,6 +635,37 @@ private class TypeStringifier
     }) + this.suffix;
     if (optional_as_null && this.optional) result = 'Null<' + result + '>';
     return result;
+  }
+
+  public function clone():TypeStringifier
+  {
+    var sheep = new TypeStringifier( switch this.child {
+      case Left(ts): ts.clone();
+      case Right(str): str;
+    });
+    sheep.optional = this.optional;
+    sheep.prefix = this.prefix;
+    sheep.suffix = this.suffix;
+    return sheep;
+  }
+
+  public function follow():TypeStringifier
+  {
+    return switch this.child {
+      case Right(str): this; // no follow necessary/possible
+      case Left(ts):
+      if (this.prefix=="" && this.suffix=="") {
+        if (this.optional==true) {
+          throw 'Do we get to this case? Can we not simply push optional to child?';
+          // Push optional down to child and continue
+          ts.optional = true;
+          return ts.follow();
+        }
+        return ts.follow();
+      }
+      this.child = ts.follow(); // collapse children too
+      return this;
+    }
   }
 }
 typedef TSChildOrBareString = OneOf<TypeStringifier,String>;
