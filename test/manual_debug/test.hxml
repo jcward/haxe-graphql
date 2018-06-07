@@ -9,8 +9,9 @@
 -cp ../../proj/ast/src
 -cp ../../proj/utils/src
 
-# Test
+# Test, do not catch parser errors (allows stack)
 -debug
+-D GQL_PARSER_DEBUG
 -cp .
 -D source-map-content
 -x Test

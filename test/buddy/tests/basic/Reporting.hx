@@ -39,7 +39,7 @@ type Query {
       });
 
       it('should contain the correct error message...', {
-        msg.should.contain("Error: Name identifier expected");
+        msg.should.contain("Error: Cannot parse the unexpected character");
       });
 
       it('...on the correct line...', {

@@ -24,7 +24,8 @@ class UnnamedQuery extends BuddySuite
 
       it("should parse 1 definitions and 2 selections from this schema", {
         parser.document.definitions.length.should.be(1);
-        parser.document.definitions[0].selectionSet.selections.length.should.be(2);
+        var d:Dynamic = parser.document.definitions[0];
+        d.selectionSet.selections.length.should.be(2);
       });
 
 
