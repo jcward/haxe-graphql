@@ -97,7 +97,7 @@ public function lookahead() {
  */
 /* public function getTokenDesc(token: Token):String {
   var value = token.value;
-  return value ? '$${token.kind} "$${value}"' : token.kind;
+  return value ? '${token.kind} "${value}"' : token.kind;
 } */
 
 /* var charCodeAt = String.prototype.charCodeAt;
@@ -117,7 +117,7 @@ private function printCharCode(code) {
         code < 0x007f
         ? haxe.Json.stringify(String.fromCharCode(code))
         : // Otherwise print the escaped form.
-          '"\\u$${(\'00\' + code.toString(16).toUpperCase()).slice(-4)}"'
+           'ESCMAD' // escaping madness
   );
 }
 
@@ -148,7 +148,7 @@ private function readToken(lexer: Lexer, prev: Token): Token {
     throw syntaxError(
       source,
       pos,
-      'Cannot contain the invalid character $${printCharCode(code)}.');
+      'Cannot contain the invalid character ${printCharCode(code)}.');
   }
 
   switch (code) {
@@ -329,7 +329,7 @@ private function readNumber(source:Source, start, firstCode, line, col, prev): T
       throw syntaxError(
         source,
         position,
-        'Invalid number, unexpected digit after 0: $${printCharCode(code)}.');
+        'Invalid number, unexpected digit after 0: ${printCharCode(code)}.');
     }
   } else {
     position = readDigits(source, position, code);
@@ -384,7 +384,7 @@ private function readDigits(source:Source, start, firstCode) {
   throw syntaxError(
     source,
     position,
-    'Invalid number, expected digit but got: $${printCharCode(code)}.');
+    'Invalid number, expected digit but got: ${printCharCode(code)}.');
 }
 
 /**
@@ -424,7 +424,7 @@ private function readString(source:Source, start, line, col, prev): Token {
       throw syntaxError(
         source,
         position,
-        'Invalid character within String: $${printCharCode(code)}.');
+        'Invalid character within String: ${printCharCode(code)}.');
     }
 
     ++position;
@@ -468,7 +468,7 @@ private function readString(source:Source, start, line, col, prev): Token {
               source,
               position,
               'Invalid character escape sequence: ' +
-                '\\u$${body.slice(position + 1, position + 5)}.');
+                '\\u${body.slice(position + 1 ...  position + 5)}.');
           }
           value += String.fromCharCode(charCode);
           position += 4;
@@ -530,7 +530,7 @@ private function readBlockString(source:Source, start, line, col, prev): Token {
       throw syntaxError(
         source,
         position,
-        'Invalid character within String: $${printCharCode(code)}.');
+        'Invalid character within String: ${printCharCode(code)}.');
     }
 
     // Escape Triple-Quote (\""")
@@ -617,7 +617,7 @@ private function readName(source:Source, start, line, col, prev): Token {
 
 
 private function syntaxError(source:Source, start:Int, msg:String) {
-  return ( { message:msg, pos:{ file:source, min:start, max:start } } : graphql.parser.Parser.Err );
+  return ( { message:msg, pos:{ file:null, min:start, max:start } } : graphql.parser.Parser.Err );
 }
 
 

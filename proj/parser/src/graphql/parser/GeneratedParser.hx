@@ -1409,7 +1409,7 @@ private function expect(lexer: Lexer, kind: TokenKindEnum): Token {
   throw syntaxError(
     lexer.source,
     token.start,
-    'Expected $${kind}, found $${getTokenDesc(token)}');
+    'Expected ${kind}, found ${getTokenDesc(token)}');
 }
 
 /**
@@ -1426,7 +1426,7 @@ private function expectKeyword(lexer: Lexer, value:String): Token {
   throw syntaxError(
     lexer.source,
     token.start,
-    'Expected "$${value}", found $${getTokenDesc(token)}');
+    'Expected "${value}", found ${getTokenDesc(token)}');
 }
 
 /**
@@ -1438,7 +1438,7 @@ private function unexpected(lexer: Lexer, ?atToken /* opt */ :Token): GraphQLErr
   return syntaxError(
     lexer.source,
     token.start,
-    'Unexpected $${getTokenDesc(token)}');
+    'Unexpected ${getTokenDesc(token)}');
 }
 
 /**
@@ -1487,7 +1487,7 @@ private function loc(lexer: Lexer, startToken: Token): Location /* | void */ {
 }
 
 private function syntaxError(source:Dynamic, start:Int, msg:String): GraphQLError {
-  return ( { message:msg, pos:{ file:source, min:start, max:start } } : graphql.parser.Parser.Err );
+  return ( { message:msg, pos:{ file:null, min:start, max:start } } : graphql.parser.Parser.Err );
 }
 
 private function getTokenDesc(t:Token) return Std.string(t);

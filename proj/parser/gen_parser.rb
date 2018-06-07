@@ -134,7 +134,7 @@ private function loc(lexer: Lexer, startToken: Token): Location /* | void */ {
 }
 
 private function syntaxError(source:Dynamic, start:Int, msg:String): GraphQLError {
-  return ( { message:msg, pos:{ file:source, min:start, max:start } } : graphql.parser.Parser.Err );
+  return ( { message:msg, pos:{ file:null, min:start, max:start } } : graphql.parser.Parser.Err );
 }
 
 private function getTokenDesc(t:Token) return Std.string(t);

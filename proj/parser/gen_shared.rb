@@ -24,8 +24,9 @@ class GenShared
       haxe.gsub!(/\`.*?\`/) { |match|
         cont = match[1,match.length-2];
         cont.gsub!('\'', '\\\\'+"'");
-        cont.gsub!('$', '$$');
-        cont.gsub!('\\\\$$', '$'); # recover actual intentional ${ }
+        cont.gsub!('\\\\$', '$'); # recover actual intentional ${ }
+        ## cont.gsub!('$', '$$');
+        ## cont.gsub!('\\\\$$', '$'); # recover actual intentional ${ }
         "'#{ cont }'"
       }
       #haxe.gsub!(/\`.*?\`/) { |match| cont = match[1,match.length-2]; cont.gsub!("'", "\'"); cont.gsub!('$', '$$'); "'#{ cont }'" }

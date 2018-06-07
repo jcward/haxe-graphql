@@ -53,6 +53,9 @@ haxe.sub!(/(public function getTokenDesc\(.*?token.kind;.*?})/m, "/* \\1 */")
 
 GenShared::backticks!(haxe)
 
+haxe.gsub!(/^(\s+).*toUpperCase.*$/, "\\1 'ESCMAD' // escaping madness")
+
+
 GenShared::basic_types_and_junk!(haxe)
 
 GenShared::func_args_trailing_comma!(haxe)
@@ -97,7 +100,7 @@ haxe.gsub!(/private function Tok.*?toJSON.*?};\s+};/m, '')
 extraMethods = <<eof
 
 private function syntaxError(source:Source, start:Int, msg:String) {
-  return ( { message:msg, pos:{ file:source, min:start, max:start } } : graphql.parser.Parser.Err );
+  return ( { message:msg, pos:{ file:null, min:start, max:start } } : graphql.parser.Parser.Err );
 }
 
 eof
@@ -112,6 +115,7 @@ GenShared::case_fall_throughs!(haxe)
 haxe.sub!(/(var charCodeAt =.*?slice;)/m, "/* \\1 */")
 haxe.gsub!(/charCodeAt.call\(\s*body\s*,\s*/, "/* CCA */source.fastGet(")
 haxe.gsub!(/slice.call\(\s*body\s*,\s*(.*?),/, "/* CCA */body.slice(\\1 ... ")
+haxe.gsub!(/body.slice\(\s*(.*?),/, "body.slice(\\1 ... ")
 haxe.gsub!(/source.body/, "source/* source.body */")
 
 haxe.gsub!(/readToken\(this/, "readToken(cast this")
