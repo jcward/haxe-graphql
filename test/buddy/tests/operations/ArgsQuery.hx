@@ -32,13 +32,9 @@ query GetReturnOfTheJedi($$id: ID) {
         d.selectionSet.selections.length.should.be(1);
       });
 
-      var haxe:String;
-      it("The HaxeGenerator should then generate Haxe...", {
-        var result = graphql.HaxeGenerator.parse(parser.document);
-        haxe = result.stdout;
-      });
-
     });
+
+    // Can't generate without full schema, see QueryTypeGeneration for full gen / compile
   }
 
 }

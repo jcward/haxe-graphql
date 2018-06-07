@@ -38,16 +38,7 @@ query AQuery {
         d.selectionSet.selections.length.should.be(6);
       });
 
-
-      var haxe:String;
-      it("The HaxeGenerator should then generate Haxe...", {
-        var result = graphql.HaxeGenerator.parse(parser.document);
-        haxe = result.stdout;
-      });
-
-      it("...DARN, the query results are just dynamic for now :cry:", {
-          haxe.should.contain("AQuery_Result = Dynamic");
-      });
+      // Can't generate without full schema
 
     });
 
