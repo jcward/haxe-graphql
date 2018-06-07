@@ -15,6 +15,8 @@ class Pos {
   public var file:String;
   public var min:Int;
   public var max:Int;
+  public var line:Int;
+  public var col:Int;
 }
 
 @:structInit
@@ -39,7 +41,23 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     var lexer:Lexer = GeneratedLexer.createLexer(source, opts);
 
     // Parser must implement Lexer
+    #if GQL_PARSER_DEBUG // for debugging, we just let it throw to get stack traces
     document = parser.parseDocument(lexer);
+    #else
+    try {
+      document = parser.parseDocument(lexer);
+    } catch (e:Err) {
+      // Format and rethrow
+      var posmsg = e.pos!=null ? '${ e.pos.line }: characters ${ e.pos.col }-${ e.pos.col + (e.pos.max - e.pos.min+1) }' : "";
+      throw '$_filename:${ posmsg } Error: ${ e.message }';
+    }
+    #end
+  }
+
+  public static function syntaxError(source:Source, line:Int, lineStart:Int, start:Int, msg:String): GraphQLError
+  {
+    var col = start - lineStart;
+    return ( { message:msg, pos:{ file:null, min:start, max:start, line:line, col:col } } : graphql.parser.Parser.Err );
   }
 
 
@@ -75,10 +93,10 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
 
   override function doSkipIgnored() skipWhitespace();
   
-  override function doMakePos(from:Int, to:Int):Pos
-  {
-    return { file:'Untitled', min:from, max:to };
-  }
+  // override function doMakePos(from:Int, to:Int):Pos
+  // {
+  //   return { file:'Untitled', min:from, max:to };
+  // }
 
   override function makeError(message:String, pos:Pos):Err
   {

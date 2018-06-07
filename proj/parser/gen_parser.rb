@@ -66,6 +66,9 @@ haxe.gsub!(/\bundefined\b/, "null/* undefined */")
 
 haxe.gsub!(/var (\w+);/, "var \\1=null /* INIT */;")
 
+# syntax error now takes line and lineStart (for reporting pos)
+haxe.gsub!(/syntaxError\(\s*lexer.source/m, "syntaxError(lexer.source, lexer.line, lexer.lineStart")
+
 
 # Missing cases / break to throw
 haxe.gsub!(/  break;(\s+}\s+throw)/m, "default: /* was break, fall through to throw */\n\\1")
@@ -130,8 +133,8 @@ private function loc(lexer: Lexer, startToken: Token): Location /* | void */ {
   return { start:startToken.start, end:lexer.lastToken.end, startToken:startToken, endToken:lexer.lastToken, source:lexer.source };
 }
 
-private function syntaxError(source:Dynamic, start:Int, msg:String): GraphQLError {
-  return ( { message:msg, pos:{ file:null, min:start, max:start } } : graphql.parser.Parser.Err );
+private function syntaxError(source:Source, line:Int, lineStart:Int, start:Int, msg:String): GraphQLError {
+  return graphql.parser.Parser.syntaxError(source, line, lineStart, start, msg);
 }
 
 private function getTokenDesc(t:Token) return Std.string(t);

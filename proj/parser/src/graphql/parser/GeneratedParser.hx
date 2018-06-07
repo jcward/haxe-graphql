@@ -1406,8 +1406,7 @@ private function expect(lexer: Lexer, kind: TokenKindEnum): Token {
     lexer.advance();
     return token;
   }
-  throw syntaxError(
-    lexer.source,
+  throw syntaxError(lexer.source, lexer.line, lexer.lineStart,
     token.start,
     'Expected ${kind}, found ${getTokenDesc(token)}');
 }
@@ -1423,8 +1422,7 @@ private function expectKeyword(lexer: Lexer, value:String): Token {
     lexer.advance();
     return token;
   }
-  throw syntaxError(
-    lexer.source,
+  throw syntaxError(lexer.source, lexer.line, lexer.lineStart,
     token.start,
     'Expected "${value}", found ${getTokenDesc(token)}');
 }
@@ -1435,8 +1433,7 @@ private function expectKeyword(lexer: Lexer, value:String): Token {
  */
 private function unexpected(lexer: Lexer, ?atToken /* opt */ :Token): GraphQLError {
   var token = atToken!=null ? atToken : lexer.token;
-  return syntaxError(
-    lexer.source,
+  return syntaxError(lexer.source, lexer.line, lexer.lineStart,
     token.start,
     'Unexpected ${getTokenDesc(token)}');
 }
@@ -1486,11 +1483,11 @@ private function loc(lexer: Lexer, startToken: Token): Location /* | void */ {
   return { start:startToken.start, end:lexer.lastToken.end, startToken:startToken, endToken:lexer.lastToken, source:lexer.source };
 }
 
-private function syntaxError(source:Dynamic, start:Int, msg:String): GraphQLError {
-  return ( { message:msg, pos:{ file:null, min:start, max:start } } : graphql.parser.Parser.Err );
+private function syntaxError(source:Source, line:Int, lineStart:Int, start:Int, msg:String): GraphQLError {
+  return graphql.parser.Parser.syntaxError(source, line, lineStart, start, msg);
 }
 
-private function getTokenDesc(t:Token) return '#{ t.kind }@#{ t.line }:#{ t.column }';
+private function getTokenDesc(t:Token) return Std.string(t);
 
   static var ValidDirectiveLocations:haxe.ds.StringMap<Bool> = [
 

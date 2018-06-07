@@ -94,10 +94,14 @@ haxe.gsub!(/private function Tok.*?toJSON.*?};\s+};/m, '')
 #tok_class.sub!(/Tok.prototype.toJSON = Tok.prototype.inspect = function toJSON/, "public function toJSON")
 #haxe = haxe + "\n\n} // end of class Lexer\n\n" + tok_class + "\n}"
 
+
+# syntax error now takes line and lineStart (for reporting pos)
+haxe.gsub!(/syntaxError\(\s*source/m, "syntaxError(source, line, lineStart")
+
 extraMethods = <<eof
 
-private function syntaxError(source:Source, start:Int, msg:String) {
-  return ( { message:msg, pos:{ file:null, min:start, max:start } } : graphql.parser.Parser.Err );
+private function syntaxError(source:Source, line:Int, col:Int, start:Int, msg:String): GraphQLError {
+  return graphql.parser.Parser.syntaxError(source, line, col, start, msg);
 }
 
 eof

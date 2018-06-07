@@ -145,8 +145,7 @@ private function readToken(lexer: Lexer, prev: Token): Token {
 
   // SourceCharacter
   if (code < 0x0020 && code != 0x0009 && code != 0x000a && code != 0x000d) {
-    throw syntaxError(
-      source,
+    throw syntaxError(source, line, lineStart,
       pos,
       'Cannot contain the invalid character ${printCharCode(code)}.');
   }
@@ -220,7 +219,7 @@ private function readToken(lexer: Lexer, prev: Token): Token {
       return readString(source, pos, line, col, prev);
   }
 
-  throw syntaxError(source, pos, unexpectedCharacterMessage(code));
+  throw syntaxError(source, line, lineStart, pos, unexpectedCharacterMessage(code));
 }
 
 /**
@@ -326,8 +325,7 @@ private function readNumber(source:Source, start, firstCode, line, col, prev): T
     // 0
     code = /* CCA */source.fastGet(++position);
     if (code >= 48 && code <= 57) {
-      throw syntaxError(
-        source,
+      throw syntaxError(source, line, lineStart,
         position,
         'Invalid number, unexpected digit after 0: ${printCharCode(code)}.');
     }
@@ -381,8 +379,7 @@ private function readDigits(source:Source, start, firstCode) {
     } while (code >= 48 && code <= 57); // 0 - 9
     return position;
   }
-  throw syntaxError(
-    source,
+  throw syntaxError(source, line, lineStart,
     position,
     'Invalid number, expected digit but got: ${printCharCode(code)}.');
 }
@@ -421,8 +418,7 @@ private function readString(source:Source, start, line, col, prev): Token {
 
     // SourceCharacter
     if (code < 0x0020 && code != 0x0009) {
-      throw syntaxError(
-        source,
+      throw syntaxError(source, line, lineStart,
         position,
         'Invalid character within String: ${printCharCode(code)}.');
     }
@@ -464,8 +460,7 @@ private function readString(source:Source, start, line, col, prev): Token {
             /* CCA */source.fastGet(position + 3),
             /* CCA */source.fastGet(position + 4));
           if (charCode < 0) {
-            throw syntaxError(
-              source,
+            throw syntaxError(source, line, lineStart,
               position,
               'Invalid character escape sequence: ' +
                 '\\u${body.slice(position + 1 ...  position + 5)}.');
@@ -474,8 +469,7 @@ private function readString(source:Source, start, line, col, prev): Token {
           position += 4;
           /* break; */
         default:
-          throw syntaxError(
-            source,
+          throw syntaxError(source, line, lineStart,
             position,
             'Invalid character escape sequence: ${String.fromCharCode(code)}.');
       }
@@ -484,7 +478,7 @@ private function readString(source:Source, start, line, col, prev): Token {
     }
   }
 
-  throw syntaxError(source, position, 'Unterminated string.');
+  throw syntaxError(source, line, lineStart, position, 'Unterminated string.');
 }
 
 /**
@@ -527,8 +521,7 @@ private function readBlockString(source:Source, start, line, col, prev): Token {
       code != 0x000a &&
       code != 0x000d
     ) {
-      throw syntaxError(
-        source,
+      throw syntaxError(source, line, lineStart,
         position,
         'Invalid character within String: ${printCharCode(code)}.');
     }
@@ -548,7 +541,7 @@ private function readBlockString(source:Source, start, line, col, prev): Token {
     }
   }
 
-  throw syntaxError(source, position, 'Unterminated string.');
+  throw syntaxError(source, line, lineStart, position, 'Unterminated string.');
 }
 
 /**
@@ -616,8 +609,8 @@ private function readName(source:Source, start, line, col, prev): Token {
 }
 
 
-private function syntaxError(source:Source, start:Int, msg:String) {
-  return ( { message:msg, pos:{ file:null, min:start, max:start } } : graphql.parser.Parser.Err );
+private function syntaxError(source:Source, line:Int, col:Int, start:Int, msg:String): GraphQLError {
+  return graphql.parser.Parser.syntaxError(source, line, col, start, msg);
 }
 
 
