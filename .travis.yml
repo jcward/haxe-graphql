@@ -9,8 +9,6 @@ haxe:
   - stable
 
 install:
-  - haxelib install tink_core
-  - haxelib install tink_parse
   - haxelib install buddy
 
 script:

@@ -1,7 +1,4 @@
 # Parser
-proj/parser/depends.hxml
-#-lib tink_parse
-#-lib tink_core
 -cp proj/parser/src
 
 # Generator

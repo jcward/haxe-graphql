@@ -62,7 +62,7 @@ package graphql;
 
 typedef TokenKindEnum = TokenKind;
 
-typedef Source = tink.parse.StringSlice;
+typedef Source = graphql.parser.StringSlice;
 
 typedef BaseNode = {
   kind:String,

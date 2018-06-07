@@ -1,5 +1,4 @@
 # Parser
-../../proj/parser/depends.hxml
 -cp ../../proj/parser/src
 
 # Generator

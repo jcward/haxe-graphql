@@ -1,9 +1,9 @@
 gql2hx - GraphQL to Haxe CLI
 -----------
 
-Convert GraphQL schema to Haxe definitions.
+Convert GraphQL schema to Haxe definitions. Try it [live in your browser!](http://jcward.com/gql2hx/)
 
-Status: alpha
+**Status:** alpha
 
 Usage:
 ---
@@ -17,7 +17,10 @@ Usage:
 
 Coming soon: generate typedefs or classess & interfaces.
 
+Development sponsored by: [www.wootmath.com](https://www.wootmath.com) [simbulus.com](https://simbulus.com/)
+
 Release notes: 
 ---
 
+ 0.0.8 - README updates
  0.0.7 - Support typing queries (expected query results)

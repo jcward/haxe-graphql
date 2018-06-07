@@ -2,10 +2,7 @@ package graphql.parser;
 
 import graphql.ASTDefs;
 
-import tink.parse.ParserBase;
-import tink.parse.Char.*;
-
-using tink.CoreApi;
+import graphql.parser.StringSlice;
 
 import graphql.parser.GeneratedParser;
 import graphql.parser.GeneratedLexer;
@@ -25,18 +22,15 @@ class Err {
   public var pos:Pos;
 }
 
-// TODO: no longer necessary to extend tink parser, but still using StringSlice
-class Parser extends tink.parse.ParserBase<Pos, Err>
+class Parser
 {
   public var document(default,null):DocumentNode;
 
-  public function new(schema:String, ?options:ParseOptions, ?filename:String='Untitled')
+  public function new(graphql_source:String, ?options:ParseOptions, ?filename:String='Untitled')
   {
-    super(schema);
-
     var parser = new GeneratedParser();
     if (options==null) options = {};
-    var lexer:Lexer = GeneratedLexer.createLexer(source, options);
+    var lexer:Lexer = GeneratedLexer.createLexer(graphql_source, options);
 
     // Parser must implement Lexer
     #if GQL_PARSER_DEBUG // for debugging, we just let it throw to get stack traces
