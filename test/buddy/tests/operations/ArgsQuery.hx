@@ -25,10 +25,11 @@ query GetReturnOfTheJedi($$id: ID) {
         parser = new graphql.parser.Parser(gql);
       });
 
-      it("should parse 1 definitions and 6 selections from this schema", {
+      it("should parse 1 definitions and 1 selection from this schema", {
         parser.document.definitions.length.should.be(1);
 
-        parser.document.definitions[0].selectionSet.selections.length.should.be(1);
+        var d:Dynamic = parser.document.definitions[0];
+        d.selectionSet.selections.length.should.be(1);
       });
 
       var haxe:String;
