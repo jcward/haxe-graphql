@@ -1447,11 +1447,10 @@ private function unexpected(lexer: Lexer, ?atToken /* opt */ :Token): GraphQLErr
  * and ends with a lex token of closeKind. Advances the parser
  * to the next lex token after the closing token.
  */
-/*
- private function any<T>(
+private function any<T>(
   lexer: Lexer,
   openKind: TokenKindEnum,
-  parseFn: (lexer: Lexer) => T,
+  parseFn: Lexer->T,
   closeKind: TokenKindEnum): Array<T> 
 {
   expect(lexer, openKind);
@@ -1460,8 +1459,7 @@ private function unexpected(lexer: Lexer, ?atToken /* opt */ :Token): GraphQLErr
     nodes.push(parseFn(lexer));
   }
   return nodes;
-} 
-*/
+}
 
 /**
  * Returns a non-empty list of parse nodes, determined by
@@ -1469,11 +1467,10 @@ private function unexpected(lexer: Lexer, ?atToken /* opt */ :Token): GraphQLErr
  * and ends with a lex token of closeKind. Advances the parser
  * to the next lex token after the closing token.
  */
-/*
- private function many<T>(
+private function many<T>(
   lexer: Lexer,
   openKind: TokenKindEnum,
-  parseFn: (lexer: Lexer) => T,
+  parseFn: Lexer->T,
   closeKind: TokenKindEnum): Array<T> {
   expect(lexer, openKind);
   var nodes = [parseFn(lexer)];
@@ -1481,8 +1478,7 @@ private function unexpected(lexer: Lexer, ?atToken /* opt */ :Token): GraphQLErr
     nodes.push(parseFn(lexer));
   }
   return nodes;
-} 
-*/
+}
 
 
 private function loc(lexer: Lexer, startToken: Token): Location /* | void */ {
@@ -1495,15 +1491,6 @@ private function syntaxError(source:Dynamic, start:Int, msg:String): GraphQLErro
 }
 
 private function getTokenDesc(t:Token) return Std.string(t);
-
-private function many(lexer:Lexer, open:TokenKind, func:haxe.Constraints.Function, close:TokenKind):Dynamic {
-throw 'Implement many';
-}
-
-// See GeneratedParser parseList() call, expects return type of Array<graphql.ValueNode>
-private function any(lexer:Lexer, open:TokenKind, func:haxe.Constraints.Function, close:TokenKind):Dynamic {
-throw 'Implement any';
-}
 
   static var ValidDirectiveLocations:haxe.ds.StringMap<Bool> = [
 

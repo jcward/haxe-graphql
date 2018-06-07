@@ -57,7 +57,8 @@ haxe.gsub!(/void \| StringValueNode/, "Null<StringValueNode>")
 haxe.gsub!(/public function parseValue\(.*?function parseType\(.*?return type.*?}/m, "/* Removed parseValue() and parseType() */")
 
 # Comment out function any<T>( )
-haxe.gsub!(/(private function (m)?any<.*?return nodes.*?})/m, "/*\n \\1 \n*/")
+# haxe.gsub!(/(private function (m)?any<.*?return nodes.*?})/m, "/*\n \\1 \n*/")
+haxe.gsub!(/\(lexer: Lexer\) => T/, "Lexer->T")
 
 # () block, currently only used with expect function
 haxe.gsub!(/\((expect.*?\)),(.*?\))\)/, "{ \\1 ; \\2 ; } /* WTH (,) block */")
@@ -137,15 +138,6 @@ private function syntaxError(source:Dynamic, start:Int, msg:String): GraphQLErro
 }
 
 private function getTokenDesc(t:Token) return Std.string(t);
-
-private function many(lexer:Lexer, open:TokenKind, func:haxe.Constraints.Function, close:TokenKind):Dynamic {
-throw 'Implement many';
-}
-
-// See GeneratedParser parseList() call, expects return type of Array<graphql.ValueNode>
-private function any(lexer:Lexer, open:TokenKind, func:haxe.Constraints.Function, close:TokenKind):Dynamic {
-throw 'Implement any';
-}
 
   static var ValidDirectiveLocations:haxe.ds.StringMap<Bool> = [
 
