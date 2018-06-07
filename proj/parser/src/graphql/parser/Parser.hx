@@ -35,6 +35,7 @@ class Parser extends tink.parse.ParserBase<Pos, Err>
     super(schema);
 
     var parser = new GeneratedParser();
+    if (options==null) options = {};
     var lexer:Lexer = GeneratedLexer.createLexer(source, options);
 
     // Parser must implement Lexer
