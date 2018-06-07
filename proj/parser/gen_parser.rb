@@ -4,9 +4,6 @@ require_relative './gen_shared'
 
 VERSION_TAG = "v0.13.2"
 url = "https://raw.githubusercontent.com/graphql/graphql-js/#{ VERSION_TAG }/src/language/parser.js"
-
-# Local for development...
-url = "http://127.0.0.1/parser.js"
 javascript = `curl --silent '#{ url }'`
 
 haxe = javascript

@@ -54,7 +54,7 @@ class GenShared
           between.gsub!(/\/\/.*?$/, "")
           between.gsub!(/\/\*.*?\*\//m, "")
           if (between.match(/^\s+$/)) then
-            match = "/* br#{ stmt }eak; */#{ obet }#{ stmt }"
+            match = "/* break; */#{ obet }#{ stmt }"
           end
         end
         match
