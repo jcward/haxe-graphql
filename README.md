@@ -6,7 +6,7 @@ Tools for parsing GraphQL schema and queries into Haxe type definitions.
 
 [![Build Status](https://travis-ci.com/jcward/haxe-graphql.svg?branch=master)](https://travis-ci.com/jcward/haxe-graphql)
 
-[Try gql2hx live in your browser!](http://jcward.com/gql2hx/)
+Try gql2hx [live in your browser](http://jcward.com/gql2hx/) or via NPM: `npm install -g gql2hx`
 
 
 [<img src="./proj/webdemo/demo.gif" width=450 alt="gql2hx web demo">](http://jcward.com/gql2hx/)
@@ -20,6 +20,8 @@ See the various directories under `./proj`:
 - [ast](./proj/ast) - GraphQL AST Definitions
 - [webdemo](./proj/webdemo) - live demo of .graphql -> Haxe code
 
-Development sponsored by:
+**Development sponsored by:**
 
-[<img src="http://www.wootmath.com/dds/a1/84/86f31a3b3dc73a74ff996f1bd2db.png" width=120 alt="Woot Math">](https://www.wootmath.com)
+- [<img src="http://www.wootmath.com/dds/a1/84/86f31a3b3dc73a74ff996f1bd2db.png" width=120 alt="Woot Math">](https://www.wootmath.com)
+
+- [<img src="https://simbulus.com/img/consulting/simbulus-logo.png" alt="Simbulus Consulting">](https://simbulus.com/)
