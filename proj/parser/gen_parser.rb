@@ -137,7 +137,7 @@ private function syntaxError(source:Source, line:Int, lineStart:Int, start:Int, 
   return graphql.parser.Parser.syntaxError(source, line, lineStart, start, msg);
 }
 
-private function getTokenDesc(t:Token) return Std.string(t);
+private function getTokenDesc(t:Token) return t.kind;
 
   static var ValidDirectiveLocations:haxe.ds.StringMap<Bool> = [
 
