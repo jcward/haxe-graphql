@@ -5,19 +5,6 @@ Convert GraphQL schema to Haxe definitions.
 
 Status: alpha
 
-GraphQL schema support:
-- [x] Basic schema
-  - [x] type, interface, union, enum
-    - [ ] review covariance of interface field and type field
-  - [x] lists and not-nulls
-  - [ ] scalar
-  - [ ] schema
-- [ ] Arguments
-- [ ] Queries
-- [ ] Yadda yadda
-
-Coming soon: generate typedefs or classess & interfaces.
-
 Usage:
 ---
 
@@ -27,3 +14,10 @@ Usage:
     -i, --infile [infile]      Input .graphql file (or "stdin") (default: null)
     -o, --outfile [outfile]    Output .hx file (or "stdout") (default: stdout)
 ```
+
+Coming soon: generate typedefs or classess & interfaces.
+
+Release notes: 
+---
+
+ 0.0.7 - Support typing queries (expected query results)

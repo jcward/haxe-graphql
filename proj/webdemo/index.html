@@ -89,43 +89,46 @@
     <span>gql2hx / HaxeGenerator.hx</span>
   </div>
   <div class="cont"><div class="err-loc"></div>
-  <textarea autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">enum Greetings {
-  Hello
-  Hi
-  Salutations
+  <textarea autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"># Creates typedefs for all schema types
+
+schema {
+  query: MyQueries
 }
 
-interface NameAndAge {
-  name : String!
-  age  : Int!
+scalar Date
+
+enum ReleaseStatus {
+  PRE_PRODUCTION
+  IN_PRODUCTION
+  RELEASED
 }
 
-interface Speech {
-  languages: [Language]!
+interface IHaveID {
+  id:ID!
 }
 
-# A comment
-type Person implements NameAndAge & Speech {
-  id:    ID!
-  name : String!
-  age   :Int!
-  friends: [Person!]
+type FilmData implements IHaveID {
+  id:ID!
+  title:String!
+  director:String
+  releaseDate:Date
+  releaseStatus:ReleaseStatus
 }
 
-type Dog implements NameAndAge {
-  id:    ID!
-  name : String!
-  age   :Int!
+type MyQueries {
+  film: [FilmData]
 }
 
-union Alive = Person | Dog
+# Creates query response typedefs
 
-enum Language {
-  English
-  Spanish
-  French
-  # etc
+query GetFilmsByDirector($director: String) {
+  film(director: $director) {
+    title
+    director
+    releaseDate
+  }
 }
+
 
 </textarea></div><div class="cont parse">
   <pre class="agate json"><code></code></pre>
@@ -176,7 +179,7 @@ function update() {
   json_pre.className = 'agate json';
   try {
     var doc = window.Demo.parse(graphql);
-    $(json_pre).find('code').text(JSON.stringify(doc, null, '  '));
+    $(json_pre).find('code').text(JSON.stringify(doc, removeLocNull, '  '));
     hljs.highlightBlock(json_pre);
   } catch (e) {
     // Parse error
@@ -207,8 +210,8 @@ function update() {
   }
 
   if (result.stderr.length>0) {
-    code_pre.className = 'agate bash';
-    $(code_pre).find('code').text(result.stderr);
+    code_pre.className = 'agate haxe';
+    $(code_pre).find('code').text('// HaxeGenerator error:\n\n// '+result.stderr);
   } else {
     code_pre.className = 'agate haxe';
     $(code_pre).find('code').text(result.stdout);
@@ -216,5 +219,11 @@ function update() {
   hljs.highlightBlock(code_pre);
 }
 update();
+
+function removeLocNull(name, val) {
+  if (name=="loc" && val==null) return undefined;
+  return val;
+}
+
 </script>
 </html>

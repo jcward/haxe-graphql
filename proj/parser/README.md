@@ -1,29 +1,11 @@
 Parsing GraphQL to GQL AST
 ---------
 
-How best to parse GraphQL to AST is an interesting question. Using
-the official [npm graphql module](https://www.npmjs.com/package/graphql) will be
-most accurate, and least effort. So that's what we use in gql2hx ([source](../gql2hx-npm), [npmjs.com](https://www.npmjs.com/package/gql2hx)).
+This is a pure-Haxe port of the graphql-js parser, specifically parser.js, lexer.js, and ast.js.
 
-There also exists a libgraphql C++ library, but it's [only](https://github.com/graphql/libgraphqlparser/#requirements) for Linux / OSX.
+It currently does not support block strings (aka triple quotes `"""`) and
+I haven't tested any unicode. But otherwise it seems to work great!
 
-However, a native Haxe implementation of a graphql parser will allow more
-interesting and flexible use cases:
-
-- Generating Haxe types from HQL at macro time.
-  - Technically you could call out to npm or a web api, but that'd be slow.
-- A live, browser-based GQL to Haxe code.
-  - Although, perhaps the graphql module compiles to browser-friendly js?
-
-Hence, I built this one on top of [tink_parse](https://github.com/haxetink/tink_parse).
-
-GraphQL schema support:
-- [x] Schema
-  - [x] type, interface, union, enum, scalar
-  - [x] lists and not-nulls
-  - [x] Arguments
-    - [x] Default values
-  - [ ] Annotations
-  - [ ] Directives
-- [ ] Queries
-- [ ] Locations and tokens
+The translation is a set of Ruby scripts (see `gen_*.rb`), mostly regex based, and currently
+targets graphql-js 0.13.2. It could possibly be updated easily as newer versions
+are released, depending on the scope of the changes.

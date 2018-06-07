@@ -24,18 +24,35 @@ class Test
     var source = '
 
 schema {
-  query: Query
-  mutation: Mutation
+  query: MyQueries
 }
 
-type Query {
-  people:[Person]! ***
+scalar Date
+
+type FilmData {
+  id:ID!
+  title:String!
+  director:String
+  releaseDate:Date
+}
+
+type MyQueries {
+  film: [FilmData]
+}
+
+query GetFilmsByDirector($$director: String) {
+  film(director: $$director) {
+    title
+    director
+    releaseDate
+  }
 }
 
 ';
 
-    var p = new graphql.parser.Parser(source);
+    var p = new graphql.parser.Parser(source, { noLocation:true });
     trace(source);
+    trace(p.document);
 
     trace('============================================================');
     trace('Generating Haxe:');

@@ -1479,7 +1479,7 @@ private function many<T>(
 
 
 private function loc(lexer: Lexer, startToken: Token): Location /* | void */ {
-  // noLocation disabled
+  if (lexer.options!=null && lexer.options.noLocation) return null;
   return { start:startToken.start, end:lexer.lastToken.end, startToken:startToken, endToken:lexer.lastToken, source:lexer.source };
 }
 

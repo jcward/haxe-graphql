@@ -12,14 +12,15 @@ class Demo
   }
 
   @:keep
-  public static function parse(source:String):graphql.ASTDefs.Document
+  public static function parse(source:String):graphql.ASTDefs.DocumentNode
   {
-    var p = new graphql.parser.Parser(source);
+    // noLocation allows JSON printing
+    var p = new graphql.parser.Parser(source, { noLocation:true });
     return p.document;
   }
 
   @:keep
-  public static function hxgen(doc:graphql.ASTDefs.Document):{ stderr:String, stdout:String }
+  public static function hxgen(doc:graphql.ASTDefs.DocumentNode):{ stderr:String, stdout:String }
   {
     return graphql.HaxeGenerator.parse(doc);
   }

@@ -1,6 +1,9 @@
 # Generator
 -cp ../hxgen/src
 
+# Required for StringSlice
+-lib tink_parse
+
 # include, aka, no main entry:
 graphql.HaxeGenerator
 
