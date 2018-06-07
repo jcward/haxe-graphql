@@ -21,7 +21,7 @@ type SomeType {
 ## TODO: BlockString disabled... ##      blk_str: String = """A block " "\" " quote!!""" ,
            str : String = "Hello World" ,
            e : ASCENDING ,
-           obj: Person = { "key":[ ASCENDING, 3.5e-3, false ], "def":null },
+           obj: Person = { key:[ ASCENDING, 3.5e-3, false ], def:null },
            sort_order:SortType = DESCENDING ):[Person]
 }
 
