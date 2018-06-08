@@ -135,6 +135,12 @@ class HaxeGenerator
         // No-op, still generating type map
       case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
         // Interfaces are a no-op in the second pass
+      case ASTDefs.Kind.INPUT_OBJECT_TYPE_DEFINITION:
+        // TODO:
+        trace('TODO -- anything special about InputObjectTypeDefinition vs any other object?');
+        var args = write_haxe_typedef(cast def);
+        newline();
+        handle_args([get_def_name(cast def)], args);
       default:
         var name = (cast def).name!=null ? (' - '+(cast def).name.value) : '';
         error('Error: unknown / unsupported definition kind: '+def.kind+name);
@@ -361,65 +367,7 @@ class HaxeGenerator
     return rtn;
   }
 
-  //function get_obj_of(named_things:Array<Dynamic>, find_name:String, parent_name:String=null) {
-  //  for (thing in named_things) {
-  //    if (thing.name!=null && thing.name.value==find_name) {
-  //      return thing;
-  //    }
-  //  }
-  //  throw 'Didn\'t find a ${ find_name } inside ${ parent_name }';
-  //  return null;
-  //}
-//
-  //function resolve_type_path(names:Array<String>, at:SomeNamedNode, root:SomeNamedNode, throw_node=false):String
-  //{
-  //  function expect_descent(parent, named_things) {
-  //    var parent_name = parent.name==null ? 'Unknown' : parent.name.value;
-  //    if (names.length==0) {
-  //      if (throw_node) {
-  //        throw parent;
-  //      } else {
-  //        throw 'Found type node ${ parent_name } but GraphQL requires specifying leaf types.';
-  //      }
-  //    }
-  //    var next_root = get_obj_of(named_things, names[0], parent_name);
-  //    var next_names = names.slice(1);
-//
-  //    if (next_names.length==0 &&
-  //        (next_root.kind==Kind.SCALAR_TYPE_DEFINITION ||
-  //        (next_root.kind==Kind.ENUM_TYPE_DEFINITION))) return next_root.name.value;
-//
-  //    var last_next_root = next_root;
-  //    if (next_root.fields==null) {
-  //      // Need name (could be wrapper in non-null and/or list)
-  //      var name:NameNode = next_root.type.name;
-  //      if (name==null) name = next_root.type.type.name;
-  //      if (name==null) name = next_root.type.type.type.name;
-  //      if (name==null) name = next_root.type.type.type.type.name;
-  //      next_names.unshift(name.value);
-  //      next_root = cast root;
-  //    }
-  //    return resolve_type_path(next_names, next_root, root, throw_node);
-  //  }
-//
-  //  if (names.length==1) switch names[0] {
-  //    case a if (a=='String' || a=='Int' || a=='ID' || a=='Boolean' || a=='Float'):
-  //    return a;
-  //  }
-//
-  //  return switch at.kind {
-  //    case ASTDefs.Kind.SCALAR_TYPE_DEFINITION | ASTDefs.Kind.ENUM_TYPE_DEFINITION | ASTDefs.Kind.UNION_TYPE_DEFINITION:
-  //      if (names.length>0) throw 'Cannot descend [${ names.join(",") }] into ${ at.kind }';
-  //      at.name.value;
-  //    case ASTDefs.Kind.OBJECT_TYPE_DEFINITION:    expect_descent(at, (cast at).fields);
-  //    case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION: expect_descent(at, (cast at).fields);
-  //    case ASTDefs.Kind.DOCUMENT:                  expect_descent(at, (cast at).definitions);
-  //    case _:
-  //      throw 'Hmm, does resolve_type_path expect ${ at.kind } ???';
-  //  }
-  //}
-
-  function resolve_type_path(path:Array<String>):ResolvedTypePath
+  function resolve_type_path(path:Array<String>, ?op_name:String):ResolvedTypePath
   {
     var ptr:{ name:String, ?fields:ArrayStringMap<TypeStringifier> } = null;
 
@@ -428,25 +376,27 @@ class HaxeGenerator
       default: null;
     } 
 
+    var err_prefix = op_name!=null ? 'Error processing operation ${ op_name }: ' : "";
+
     var orig_path = path.join('.');
     var last_ts = null;
     while (path.length>0) {
       var name = path.shift();
       if (ptr==null) {
         ptr = type_map.get(name);
-        if (ptr==null) throw 'Didn\'t find root type ${ name }';
+        if (ptr==null) throw '${ err_prefix }Didn\'t find root type ${ name }';
       } else {
-        if (ptr.fields==null) throw 'Expecting ${ ptr.name } to have fields --> ${ name }!';
+        if (ptr.fields==null) throw '${ err_prefix }Expecting type ${ ptr.name } to have fields --> ${ name }!';
         var ts = ptr.fields.get(name);
-        if (ts==null) throw 'Expecting ${ ptr.name } to have field ${ name }!';
+        if (ts==null) throw '${ err_prefix }Expecting type ${ ptr.name } to have field ${ name }!';
         ts = ts.follow();
         last_ts = ts;
         if (path.length==0) break;
         var nm:String = ts.child;
         if (ts.prefix.indexOf('Array')>=0) nm = array_inner_type(ts);
-        if (nm==null) throw 'Expecting ts to have a name child -- is that not right?';
+        if (nm==null) throw '${ err_prefix }Expecting ts to have a name child -- is that not right?';
         ptr = type_map.get(nm);
-        if (ptr==null) throw 'Didn\'t find expected root type ${ nm }';
+        if (ptr==null) throw '${ err_prefix }Didn\'t find expected root type ${ nm }';
       }
     }
 
@@ -457,7 +407,7 @@ class HaxeGenerator
     var type_string:String = is_list ? array_inner_type(last_ts) : last_ts.toString();
 
     var resolved = type_map[type_string];
-    if (resolved==null) throw 'Resolved ${ orig_path } to unknown type ${ type_string }';
+    if (resolved==null) throw '${ err_prefix }Resolved ${ orig_path } to unknown type ${ type_string }';
     if (resolved.fields==null) {
       return LEAF(type_string, is_opt);
     } else {
@@ -471,22 +421,13 @@ class HaxeGenerator
   {
     _stdout_writer.append('/* Operation def: */');
 
-    if (def.operation!='query') throw 'Only OperationDefinitionNodes of type query are supported...';
-    if (def.name==null || def.name.value==null) throw 'Only named queries are supported...';
+    if (def.name==null || def.name.value==null) throw 'Only named operations are supported...';
 
     var op_name = def.name.value;
-    // _stdout_writer.append('typedef ${ op_name }_Result = Dynamic; /* TODO !! */');
+
+    if (def.operation!='query') throw 'Error processing ${ op_name }: Only queries are supported (mutation coming soon)...';
 
     var types:haxe.DynamicAccess<Dynamic> = {};
-
-    // trace('HI');
-    // trace('Resolve_scalar: Query: '+resolve_type_path(['Query', 'hero', 'name']));
-    // trace('Resolve_scalar: Query: '+resolve_type_path(['Query', 'hero', 'id']));
-    // trace('Resolve_scalar: Query: '+resolve_type_path(['Query', 'hero', 'born']));
-    // // Throws, as expected -- must specify sub-fields of friends (Character)
-    // trace('Resolve_scalar: Query: '+resolve_type_path(['Query', 'hero', 'friends']));
-    // trace('Resolve_scalar: Query: '+resolve_type_path(['Query', 'hero', 'friends', 'name']));
-
 
     function handle_selection_set(sel_set:{ selections:Array<SelectionNode> },
                                   type_path:Array<String>, // always abs
@@ -498,8 +439,6 @@ class HaxeGenerator
       var ind:String = '';
       for (i in 0...indent) ind += '  ';
 
-      // Always resolve names from root?
-      //var base_type:String = resolve_type_path(names, cast root);
       for (sel_node in sel_set.selections) {
         switch (sel_node.kind) { // FragmentSpead | Field | InlineFragment
           case Kind.FIELD:
@@ -510,7 +449,7 @@ class HaxeGenerator
 
             var next_type_path = type_path.slice(0);
             next_type_path.push(name);
-            switch resolve_type_path(next_type_path) {
+            switch resolve_type_path(next_type_path, op_name) {
               case ROOT: throw 'Type path ${ type_path.join(",") } in query ${ op_name } should not resolve to root!';
               case LEAF(str, opt):
                 if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
@@ -520,7 +459,7 @@ class HaxeGenerator
                 if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
                 var prefix = ind + (opt ? "?" : "");
                 var suffix1 = (list ? 'Array<{' : '{') + ' /* subset of ${ str } */';
-                var suffix2 = (list ? '}>' : '}');
+                var suffix2 = (list ? '}>,' : '},');
                 _stdout_writer.append('$prefix$alias:$suffix1');
                 handle_selection_set(field_node.selectionSet, [ str ], indent+1);
                 _stdout_writer.append('$ind$suffix2');
@@ -674,3 +613,36 @@ typedef FieldArguments = Array<{
   field:String,
   arguments:Array<InputValueDefinitionNode>
 }>
+
+
+// - - - -
+// Utils
+// - - - -
+
+
+// By @jbaudi and @fponticelli, https://gist.github.com/mrcdk/d881f85d64379e4384b1
+abstract OneOf<A, B>(Either<A, B>) from Either<A, B> to Either<A, B> {
+  @:from inline static function fromA<A, B>(a:A) : OneOf<A, B> return Left(a);
+  @:from inline static function fromB<A, B>(b:B) : OneOf<A, B> return Right(b);
+
+  @:to inline function toA():Null<A> return switch(this) {case Left(a): a; default: null;}
+  @:to inline function toB():Null<B> return switch(this) {case Right(b): b; default: null;}
+
+  // auto OneOf<A,B> <--> OneOf<B,A>
+  @:to inline function swap():OneOf<B, A> return switch this {case Right(b): Left(b); case Left(a): Right(a);}
+}
+
+
+@:forward
+abstract ArrayStringMap<T>(haxe.ds.StringMap<T>) from haxe.ds.StringMap<T> to haxe.ds.StringMap<T> {
+  public function new() { return new haxe.ds.StringMap<T>(); }
+  @:arrayAccess
+  public inline function get(key:String) {
+    return this.get(key);
+  }
+  @:arrayAccess
+  public inline function arrayWrite(k:String, v:T):T {
+    this.set(k, v);
+    return v;
+  }
+}

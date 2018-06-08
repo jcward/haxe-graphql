@@ -30,13 +30,13 @@ class UnnamedQuery extends BuddySuite
 
 
       var haxe:String;
-      it("But... the HaxeGenerator should throw -- only named queries are supported...", {
+      it("But... the HaxeGenerator should throw -- only named operations are supported...", {
         try {
           var result = graphql.HaxeGenerator.parse(parser.document);
           haxe = result.stdout;
           "OH NO".should.contain("IT DIDN'T THROW");
         } catch (e:Dynamic) {
-          Std.string(e).should.contain("Only named queries are supported...");
+          Std.string(e).should.contain("Only named operations are supported...");
         }
       });
 

@@ -4,9 +4,8 @@
 # Generator
 -cp ../../proj/hxgen/src
 
-# AST / Utils
+# AST
 -cp ../../proj/ast/src
--cp ../../proj/utils/src
 
 # Test
 -lib buddy

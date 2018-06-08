@@ -4,9 +4,8 @@
 # Generator
 -cp ../../proj/hxgen/src
 
-# AST / Utils
+# AST
 -cp ../../proj/ast/src
--cp ../../proj/utils/src
 
 # Test, do not catch parser errors (allows stack)
 -debug

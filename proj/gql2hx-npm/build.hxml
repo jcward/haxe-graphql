@@ -4,9 +4,8 @@
 # include, aka, no main entry:
 graphql.HaxeGenerator
 
-# AST / Utils
+# AST
 -cp ../ast/src
--cp ../utils/src
 
 # output
 -js dist/hxgen.js

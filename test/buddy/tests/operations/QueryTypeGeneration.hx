@@ -15,9 +15,14 @@ schema {
 
 scalar Date
 
+type Director {
+  name: String!
+  age:Int!
+}
+
 type FilmData {
   title:ID!
-  director:String
+  director:Director
   releaseDate:Date
 }
 
@@ -28,7 +33,10 @@ type FooBarQuery {
 query GetReturnOfTheJedi($$id: ID) {
   film(id: $$id) {
     title
-    director
+    director {
+      name
+      age
+    }
     releaseDate
   }
 }
@@ -44,8 +52,8 @@ query GetReturnOfTheJedi($$id: ID) {
         parser = new graphql.parser.Parser(gql);
       });
 
-      it("should parse 5 definitions from this schema", {
-        parser.document.definitions.length.should.be(5);
+      it("should parse 6 definitions from this schema", {
+        parser.document.definitions.length.should.be(6);
       });
 
       var haxe_code:String;
@@ -69,7 +77,7 @@ query GetReturnOfTheJedi($$id: ID) {
           type_of_getReturnOfTheJediQuery.should.contain('?film:Array');
           type_of_getReturnOfTheJediQuery.should.contain('title:ID');
           type_of_getReturnOfTheJediQuery.should.not.contain('?title:ID');
-          type_of_getReturnOfTheJediQuery.should.contain('?director:String');
+          type_of_getReturnOfTheJediQuery.should.contain('?director:{');
           type_of_getReturnOfTheJediQuery.should.contain('?releaseDate:Date');
       });
 
