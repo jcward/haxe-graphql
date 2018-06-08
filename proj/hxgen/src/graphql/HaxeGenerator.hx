@@ -84,6 +84,24 @@ class HaxeGenerator
     }
   }
 
+  private function handle_variables(opv:OpVariables) {
+    if (opv==null || opv.variables==null || opv.variables.length==0) return;
+    var fields:Array<FieldDefinitionNode> = [];
+    for (v in opv.variables) {
+      fields.push({
+        kind:Kind.FIELD_DEFINITION,
+        type:v.type,
+        name:v.variable.name
+      });
+    }
+    var vars_obj:ObjectTypeDefinitionNode = {
+      kind:Kind.OBJECT_TYPE_DEFINITION,
+      name:{ value:'OP_${ opv.op_name }_Vars', kind:Kind.NAME },
+      fields:fields
+    };
+    write_haxe_typedef(vars_obj);
+  }
+
   // Parse a graphQL AST document, generating Haxe code
   private function parse_document(doc:DocumentNode) {
     // Parse definitions
@@ -150,8 +168,9 @@ class HaxeGenerator
     // Third pass: write operation results
     for (def in doc.definitions) switch def.kind {
       case ASTDefs.Kind.OPERATION_DEFINITION:
-        write_operation_def_result(root_schema, doc, cast def);
+        var vars = write_operation_def_result(root_schema, doc, cast def);
         newline();
+        handle_variables(vars);
       default:
     }
 
@@ -417,13 +436,13 @@ class HaxeGenerator
 
   function write_operation_def_result(root_schema:SchemaMap,
                                       root:ASTDefs.DocumentNode,
-                                      def:ASTDefs.OperationDefinitionNode):Void
+                                      def:ASTDefs.OperationDefinitionNode):OpVariables
   {
-    _stdout_writer.append('/* Operation def: */');
-
     if (def.name==null || def.name.value==null) throw 'Only named operations are supported...';
 
     var op_name = def.name.value;
+
+    _stdout_writer.append('/* Operation def: ${ op_name } */');
 
     if (def.operation!='query') throw 'Error processing ${ op_name }: Only queries are supported (mutation coming soon)...';
 
@@ -473,9 +492,11 @@ class HaxeGenerator
     var query_root_name = (root_schema==null || root_schema.query_type==null) ? 'Query' : root_schema.query_type;
     // var query_root = get_obj_of(root.definitions, query_root, 'Document');
 
-    _stdout_writer.append('typedef QueryResult_${ op_name } = {');
+    _stdout_writer.append('typedef OP_${ op_name }_Result = {');
     handle_selection_set(def.selectionSet, [ query_root_name ]);
     _stdout_writer.append('}');
+
+    return { op_name:op_name, variables:def.variableDefinitions };
   }
 
   // Init ID type as lenient abstract over String
@@ -483,9 +504,10 @@ class HaxeGenerator
   function init_base_types() {
     // ID
     _stdout_writer.append('/* - - - - Haxe / GraphQL compatibility types - - - - */');
-    _stdout_writer.append('abstract IDString(String) to String {\n  // Strict safety -- require explicit fromString');
-    _stdout_writer.append('  public static inline function fromString(s:String) return cast s;');
-    _stdout_writer.append('  public static inline function ofString(s:String) return cast s;');
+    _stdout_writer.append('abstract IDString(String) to String from String {\n  // Relaxed safety -- allow implicit fromString');
+    _stdout_writer.append('//  TODO: optional strict safety -- require explicit fromString:');
+    _stdout_writer.append('//  public static inline function fromString(s:String) return cast s;');
+    _stdout_writer.append('//  public static inline function ofString(s:String) return cast s;');
     _stdout_writer.append('}');
     _stdout_writer.append('typedef ID = IDString;');
     type_defined('ID');
@@ -611,8 +633,14 @@ typedef TSChildOrBareString = OneOf<TypeStringifier,String>;
 
 typedef FieldArguments = Array<{
   field:String,
-  arguments:Array<InputValueDefinitionNode>
+  arguments:Array<InputValueDefinitionNode>,
+  ?variables:Array<VariableDefinitionNode>
 }>
+
+typedef OpVariables = {
+  op_name:String,
+  variables:Array<VariableDefinitionNode>
+};
 
 
 // - - - -

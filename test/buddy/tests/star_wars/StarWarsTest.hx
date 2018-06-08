@@ -42,7 +42,7 @@ class StarWarsTest extends BuddySuite
         var exec_code = '
         class StarWars {
           public static function main() {
-            var luke = { "name":"Luke", id:IDString.ofString("123"), friends:[], appearsIn:[  NEWHOPE, EMPIRE, JEDI ] };
+            var luke = { "name":"Luke", id:"abc123", friends:[], appearsIn:[  NEWHOPE, EMPIRE, JEDI ] };
             trace(\'Use the force, $${ luke }\');
             trace(\'And $${ luke.name } appears in $${ luke.appearsIn.length } episodes (known by the current schema)\');
           }

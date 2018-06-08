@@ -62,32 +62,48 @@ query GetReturnOfTheJedi($$id: ID) {
         haxe_code = result.stdout;
       });
 
-      it("...and the query type should be present...", {
-        haxe_code.should.contain("typedef QueryResult_GetReturnOfTheJedi");
+      it("...and the query result and vars types should be present...", {
+        haxe_code.should.contain("typedef OP_GetReturnOfTheJedi_Result");
+        haxe_code.should.contain('typedef OP_GetReturnOfTheJedi_Vars');
       });
 
-      var type_of_getReturnOfTheJediQuery:String = "";
-      it("...and it should have correct types, arrays, and optionality.", {
-          var capture = false;
-          for (line in haxe_code.split("\n")) {
-            if (line.indexOf('typedef QueryResult_GetReturnOfTheJedi')>=0) capture = true;
-            if (capture) type_of_getReturnOfTheJediQuery += line + "\n";
-          }
+      var result_type_of_getReturnOfTheJediQuery:String = "";
+      it("...and the result type should have correct types, arrays, and optionality.", {
+        var capture = false;
+        for (line in haxe_code.split("\n")) {
+          if (line.indexOf('typedef OP_GetReturnOfTheJedi_Result')>=0) capture = true;
+          if (capture==true && line=='}') capture = false;
+          if (capture) result_type_of_getReturnOfTheJediQuery += line + "\n";
+        }
 
-          type_of_getReturnOfTheJediQuery.should.contain('?film:Array');
-          type_of_getReturnOfTheJediQuery.should.contain('title:ID');
-          type_of_getReturnOfTheJediQuery.should.not.contain('?title:ID');
-          type_of_getReturnOfTheJediQuery.should.contain('?director:{');
-          type_of_getReturnOfTheJediQuery.should.contain('?releaseDate:Date');
+        // result type:
+        result_type_of_getReturnOfTheJediQuery.should.contain('?film:Array');
+        result_type_of_getReturnOfTheJediQuery.should.contain('title:ID');
+        result_type_of_getReturnOfTheJediQuery.should.not.contain('?title:ID');
+        result_type_of_getReturnOfTheJediQuery.should.contain('?director:{');
+        result_type_of_getReturnOfTheJediQuery.should.contain('?releaseDate:Date');
       });
 
+      var vars_type_of_getReturnOfTheJediQuery:String = "";
+      it("...and the vars type should have correct types and optionality.", {
+        var capture = false;
+        for (line in haxe_code.split("\n")) {
+          if (line.indexOf('typedef OP_GetReturnOfTheJedi_Vars')>=0) capture = true;
+          if (capture) vars_type_of_getReturnOfTheJediQuery += line + "\n";
+          if (capture==true && line=='}') capture = false;
+        }
+
+        // vars type:
+        vars_type_of_getReturnOfTheJediQuery.should.contain('typedef OP_GetReturnOfTheJedi_Vars');
+        vars_type_of_getReturnOfTheJediQuery.should.contain('?id: ID');
+      });
 
 
       it("We can be write to /tmp/QueryGen.hx...", function() {
         var exec_code = '
         class QueryGen {
           public static function main() {
-            var q:QueryResult_GetReturnOfTheJedi = null;
+            var q:OP_GetReturnOfTheJedi_Result = null;
             $$type(q.film[0]);         // prints type to stderr
             trace("and we executed");  // prints to stdout
           }

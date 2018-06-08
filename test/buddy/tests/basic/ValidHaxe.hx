@@ -22,7 +22,7 @@ class ValidHaxe extends BuddySuite
         var exec_code = '
         class Test {
           public static function main() {
-            var dog = { "name":"woof", id:IDString.ofString("123") };
+            var dog = { "name":"woof", id:"abc123" };
             trace(\'hello buddy, my name is $${ dog.name }\');
           }
         }
