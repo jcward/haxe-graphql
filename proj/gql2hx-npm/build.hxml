@@ -4,6 +4,9 @@
 # include, aka, no main entry:
 graphql.HaxeGenerator
 
+# Need parser cp for StringSlice
+-cp ../parser/src
+
 # AST
 -cp ../ast/src
 
