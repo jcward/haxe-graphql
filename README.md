@@ -22,6 +22,6 @@ See the various directories under `./proj`:
 
 **Development sponsored by:**
 
-- [<img src="http://www.wootmath.com/dds/a1/84/86f31a3b3dc73a74ff996f1bd2db.png" width=120 alt="Woot Math">](https://www.wootmath.com)
+[<img src="http://www.wootmath.com/dds/a1/84/86f31a3b3dc73a74ff996f1bd2db.png" width=120 alt="Woot Math">](https://www.wootmath.com)  
 
-- [<img src="https://simbulus.com/img/consulting/simbulus-logo.png" alt="Simbulus Consulting">](https://simbulus.com/)
+[<img src="https://simbulus.com/img/consulting/simbulus-logo.png" alt="Simbulus Consulting">](https://simbulus.com/)
