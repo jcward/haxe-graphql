@@ -119,10 +119,10 @@ class HaxeGenerator
     //          interface field (covariant)."
     for (def in doc.definitions) {
       switch (def.kind) {
-        case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
-          var args = write_interface_as_haxe_base_typedef(cast def);
-          newline();
-          handle_args([get_def_name(cast def)], args);
+        // case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
+        //   var args = write_interface_as_haxe_base_typedef(cast def);
+        //   newline();
+        //   handle_args([get_def_name(cast def)], args);
         case ASTDefs.Kind.SCHEMA_DEFINITION:
           if (root_schema!=null) error('Error: cannot specify two schema definitions');
           root_schema = write_schema_def(cast def);
@@ -152,10 +152,12 @@ class HaxeGenerator
       case ASTDefs.Kind.OPERATION_DEFINITION:
         // No-op, still generating type map
       case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
-        // Interfaces are a no-op in the second pass
+        // TODO: anything special about Interfaces ?
+        var args = write_haxe_typedef(cast def);
+        newline();
+        handle_args([get_def_name(cast def)], args);
       case ASTDefs.Kind.INPUT_OBJECT_TYPE_DEFINITION:
-        // TODO:
-        trace('TODO -- anything special about InputObjectTypeDefinition vs any other object?');
+        // TODO: anything special about InputObjectTypeDefinition ?
         var args = write_haxe_typedef(cast def);
         newline();
         handle_args([get_def_name(cast def)], args);
@@ -247,26 +249,27 @@ class HaxeGenerator
 
     var interface_fields_from = new ArrayStringMap<String>();
     var skip_interface_fields = new ArrayStringMap<TypeStringifier>();
-    if (def.interfaces!=null) {
-      for (intf in def.interfaces) {
-        var ifname = intf.name.value;
-        if (!_interfaces.exists(ifname)) throw 'Requested interface '+ifname+' (implemented by '+def.name.value+') not found';
-        var intf = _interfaces[ifname];
-        _stdout_writer.append('  /* implements interface */ > '+ifname+',');
-        for (field_name in intf.keys()) {
-          if (!skip_interface_fields.exists(field_name)) {
-            skip_interface_fields[field_name] = intf.get(field_name);
-            interface_fields_from[field_name] = ifname;
-          } else {
-            // Two interfaces could imply the same field name... in which
-            // case we need to ensure the "more specific" definition is kept.
-            if (!type0_equal_to_type1(intf.get(field_name), skip_interface_fields[field_name])) {
-              throw 'Type '+def.name.value+' inherits field '+field_name+' from multiple interfaces ('+ifname+', '+interface_fields_from[field_name]+'), the types of which do not match.';
-            }
-          }
-        }
-      }
-    }
+
+//    if (def.interfaces!=null) {
+//      for (intf in def.interfaces) {
+//        var ifname = intf.name.value;
+//        if (!_interfaces.exists(ifname)) throw 'Requested interface '+ifname+' (implemented by '+def.name.value+') not found';
+//        var intf = _interfaces[ifname];
+//        _stdout_writer.append('  /* implements interface */ > '+ifname+',');
+//        for (field_name in intf.keys()) {
+//          if (!skip_interface_fields.exists(field_name)) {
+//            skip_interface_fields[field_name] = intf.get(field_name);
+//            interface_fields_from[field_name] = ifname;
+//          } else {
+//            // Two interfaces could imply the same field name... in which
+//            // case we need to ensure the "more specific" definition is kept.
+//            if (!type0_equal_to_type1(intf.get(field_name), skip_interface_fields[field_name])) {
+//              throw 'Type '+def.name.value+' inherits field '+field_name+' from multiple interfaces ('+ifname+', '+interface_fields_from[field_name]+'), the types of which do not match.';
+//            }
+//          }
+//        }
+//      }
+//    }
 
     var fields = new ArrayStringMap<TypeStringifier>();
     type_defined(def.name.value, fields);
@@ -308,32 +311,32 @@ class HaxeGenerator
     return args;
   }
 
-  function write_interface_as_haxe_base_typedef(def:ASTDefs.ObjectTypeDefinitionNode):FieldArguments
-  {
-    var args:FieldArguments = [];
-
-    if (def.name==null || def.name.value==null) throw 'Expecting interface must have a name';
-    var name = def.name.value;
-    if (_interfaces.exists(name)) throw 'Duplicate interface named '+name;
-
-    var intf = new ArrayStringMap<TypeStringifier>();
-    for (field in def.fields) {
-      var type = parse_type(field.type);
-      var field_name = field.name.value;
-      intf[field_name] = type;
-
-      if (field.arguments!=null && field.arguments.length>0) {
-        args.push({ field:field_name, arguments:field.arguments });
-      }
-    }
-
-    _interfaces[name] = intf;
-
-    // Generate the interface like a type
-    write_haxe_typedef(def);
-
-    return args;
-  }
+//  function write_interface_as_haxe_base_typedef(def:ASTDefs.ObjectTypeDefinitionNode):FieldArguments
+//  {
+//    var args:FieldArguments = [];
+//
+//    if (def.name==null || def.name.value==null) throw 'Expecting interface must have a name';
+//    var name = def.name.value;
+//    if (_interfaces.exists(name)) throw 'Duplicate interface named '+name;
+//
+//    var intf = new ArrayStringMap<TypeStringifier>();
+//    for (field in def.fields) {
+//      var type = parse_type(field.type);
+//      var field_name = field.name.value;
+//      intf[field_name] = type;
+//
+//      if (field.arguments!=null && field.arguments.length>0) {
+//        args.push({ field:field_name, arguments:field.arguments });
+//      }
+//    }
+//
+//    _interfaces[name] = intf;
+//
+//    // Generate the interface like a type
+//    write_haxe_typedef(def);
+//
+//    return args;
+//  }
 
   function write_haxe_enum(def:ASTDefs.EnumTypeDefinitionNode) {
     // trace('Generating enum: '+def.name.value);
