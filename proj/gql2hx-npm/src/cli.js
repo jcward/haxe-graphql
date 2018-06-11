@@ -14,6 +14,7 @@ args
   .usage('-i <file> [-o <outfile>] [-p <package name>] [-g generate]')
   .option('-i, --infile [infile]', 'Input .graphql file (or "stdin")', null)
   .option('-o, --outfile [outfile]', 'Output .hx file (or "stdout")', "stdout")
+  .option('-p, --parse-only', 'Run the parser only (for syntax validation)', false)
 //  .option('-p, --package [package]', 'Output Haxe package (e.g. "pkg.subpkg")', "")
 //  .option('-g, --generate [generate]', 'Generate "typedefs" or "classes" and interfaces', "typedefs")
   .parse(process.argv);
@@ -46,6 +47,9 @@ build_step('parsing GraphQL', function() {
   var s = new GraphQL.Source( input.toString(), input_filename );
   ast_document = GraphQL.parse( s );
 });
+
+// --parse-only
+if (args.parseOnly) process.exit(0);
 
 // Pass to HaxeGenerator
 var result = null;

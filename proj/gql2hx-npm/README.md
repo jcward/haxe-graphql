@@ -22,6 +22,7 @@ Development sponsored by: [www.wootmath.com](https://www.wootmath.com) [simbulus
 Release notes: 
 ---
 
- 0.0.9 - Generate query vars type (also renamed prefixes/suffixes)  
- 0.0.8 - README updates  
- 0.0.7 - Support typing queries (expected query results)  
+ 0.0.10 - Added -p option for --parse-only  
+ 0.0.9  - Generate query vars type (also renamed prefixes/suffixes)  
+ 0.0.8  - README updates  
+ 0.0.7  - Support typing queries (expected query results)  
