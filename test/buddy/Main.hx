@@ -10,6 +10,7 @@ class Main implements Buddy<[
                              tests.operations.BasicQuery,
                              tests.operations.ArgsQuery,
                              tests.operations.QueryTypeGeneration,
+                             tests.operations.MutationTypeGeneration,
                              tests.operations.UnnamedQuery,
                              tests.star_wars.StarWarsTest
 ]> {}

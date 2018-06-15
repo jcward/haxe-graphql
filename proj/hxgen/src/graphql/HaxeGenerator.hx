@@ -451,11 +451,11 @@ class HaxeGenerator
   function parse_op_for_fragment_unions(root_schema:SchemaMap,
                                         root:ASTDefs.DocumentNode,
                                         op_name:String,
-                                        query_root_name:String,
+                                        op_root_type:String,
                                         def:ASTDefs.OperationDefinitionNode):Void
   {
     // _stdout_writer.append('typedef OP_${ op_name }_Result = {');
-    // handle_selection_set(op_name, def.selectionSet, [ query_root_name ], true);
+    // handle_selection_set(op_name, def.selectionSet, [ op_root_type ], true);
     // _stdout_writer.append('}');
   }
 
@@ -468,7 +468,7 @@ class HaxeGenerator
     trace(sel_set);
     #if (js && debug) js.Lib.debug(); #end
 
-    _stdout_writer.append('/* union for Query $op_name fragments at ${ type_path.join(".") } */');
+    _stdout_writer.append('/* union for operation $op_name fragments at ${ type_path.join(".") } */');
     var union_name = 'QFrag_${ op_name }_${ type_path.join("_") }';
     var ud:UnionTypeDefinitionNode = {
         kind:Kind.UNION_TYPE_DEFINITION,
@@ -523,7 +523,7 @@ class HaxeGenerator
         var next_type_path = type_path.slice(0);
         next_type_path.push(name);
         switch resolve_type_path(next_type_path, op_name) {
-          case ROOT: throw 'Type path ${ type_path.join(",") } in query ${ op_name } should not resolve to root!';
+          case ROOT: throw 'Type path ${ type_path.join(",") } in operation ${ op_name } should not resolve to root!';
           case LEAF(str, opt):
             if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
             var prefix = ind + (opt ? "?" : "");
@@ -558,17 +558,21 @@ class HaxeGenerator
 
     _stdout_writer.append('/* Operation def: ${ op_name } */');
 
-    if (def.operation!='query') throw 'Error processing ${ op_name }: Only queries are supported (mutation coming soon)...';
+    var op_root_type = '';
+    if (def.operation=='query') {
+      op_root_type = (root_schema==null || root_schema.query_type==null) ? 'Query' : root_schema.query_type;
+    } else if (def.operation=='mutation') {
+      op_root_type = (root_schema==null || root_schema.mutation_type==null) ? 'Mutation' : root_schema.mutation_type;
+    } else {
+      throw 'Error processing ${ op_name }: Only query and mutation are supported.';
+    }
 
     var types:haxe.DynamicAccess<Dynamic> = {};
 
-    var query_root_name = (root_schema==null || root_schema.query_type==null) ? 'Query' : root_schema.query_type;
-    // var query_root = get_obj_of(root.definitions, query_root, 'Document');
-
-    parse_op_for_fragment_unions(root_schema, root, op_name, query_root_name, def);
+    parse_op_for_fragment_unions(root_schema, root, op_name, op_root_type, def);
 
     _stdout_writer.append('typedef OP_${ op_name }_Result = {');
-    handle_selection_set(op_name, def.selectionSet, [ query_root_name ]);
+    handle_selection_set(op_name, def.selectionSet, [ op_root_type ]);
     _stdout_writer.append('}');
 
     return { op_name:op_name, variables:def.variableDefinitions };

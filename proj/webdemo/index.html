@@ -93,6 +93,7 @@
 
 schema {
   query: MyQueries
+  mutation: MyMutations
 }
 
 scalar Date
@@ -115,18 +116,27 @@ type FilmData implements IHaveID {
   releaseStatus:ReleaseStatus
 }
 
+# - Queries - -
 type MyQueries {
   film: [FilmData]
 }
 
 # Creates query response typedefs
-
 query GetFilmsByDirector($director: String) {
   film(director: $director) {
     title
     director
     releaseDate
   }
+}
+
+# - Mutations - -
+type MyMutations {
+  insert_film(title:String!, director:String, releaseDate:Date, releaseStatus:ReleaseStatus): FilmData
+}
+
+mutation InsertFilm($title:String!, $director:String, $releaseDate:Date, $releaseStatus:ReleaseStatus) {
+  insert_film(title: $title, director: $director, releaseDate: $releaseDate, releaseStatus: $releaseStatus) { id }
 }
 
 

@@ -24,53 +24,51 @@ class Test
     var source = '
 
 schema {
+  query: MyQueries
   mutation: MyMutations
 }
 
-interface HasName {
-  name:String!
+scalar Date
+
+enum ReleaseStatus {
+  PRE_PRODUCTION
+  IN_PRODUCTION
+  RELEASED
 }
 
-union Being = Person | Dog
+interface IHaveID {
+  id:ID!
+}
 
-interface Job {
+type FilmData implements IHaveID {
+  id:ID!
   title:String!
+  director:String
+  releaseDate:Date
+  releaseStatus:ReleaseStatus
 }
 
-type Plumber implements Job {
-  title:String!
-  plumber_id:ID!
+# - Queries - -
+type MyQueries {
+  film: [FilmData]
 }
 
-type Person implements HasName {
-  person_id:ID!
-  name:String!
-  job:Job
+# Creates query response typedefs
+query GetFilmsByDirector($$director: String) {
+  film(director: $$director) {
+    title
+    director
+    releaseDate
+  }
 }
 
-type Dog implements HasName {
-  dog_id:ID!
-  name:String!
-}
-
-# - - Mutations - -
-
+# - Mutations - -
 type MyMutations {
-  insert_person(person:Person!): Person
+  insert_film(title:String!, director:String, releaseData:Date, releaseStatus:ReleaseStatus): FilmData
 }
 
-input JobInput {
-  title:String!
-}
-
-input PersonInput {
-  person_id:ID!
-  name:String!
-  job:JobInput
-}
-
-mutation InsertPerson($$input: PersonInput!) {
-  insert_person(input: $$input) { person_id }
+mutation InsertFilm($$title:String!, $$director:String, $$releaseData:Date, $$releaseStatus:ReleaseStatus) {
+  insert_film(title: $$title, director: $$director, releaseData: $$releaseData, releaseStatus: $$releaseStatus) { id }
 }
 
 ';
