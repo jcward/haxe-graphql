@@ -140,7 +140,7 @@ class HaxeGenerator
         write_haxe_scalar(cast def);
         newline();
       case ASTDefs.Kind.ENUM_TYPE_DEFINITION:
-        write_haxe_enum(cast def);
+        write_haxe_abstract_enum(cast def);
         newline();
       case ASTDefs.Kind.OBJECT_TYPE_DEFINITION:
         var args = write_haxe_typedef(cast def);
@@ -338,12 +338,23 @@ class HaxeGenerator
 //    return args;
 //  }
 
-  function write_haxe_enum(def:ASTDefs.EnumTypeDefinitionNode) {
+  // TODO: optional?
+  // function write_haxe_enum(def:ASTDefs.EnumTypeDefinitionNode) {
+  //   // trace('Generating enum: '+def.name.value);
+  //   type_defined(def.name.value);
+  //   _stdout_writer.append('enum '+def.name.value+' {');
+  //   for (enum_value in def.values) {
+  //     _stdout_writer.append('  '+enum_value.name.value+';');
+  //   }
+  //   _stdout_writer.append('}');
+  // }
+
+  function write_haxe_abstract_enum(def:ASTDefs.EnumTypeDefinitionNode) {
     // trace('Generating enum: '+def.name.value);
     type_defined(def.name.value);
-    _stdout_writer.append('enum '+def.name.value+' {');
+    _stdout_writer.append('@:enum abstract '+def.name.value+'(String) {');
     for (enum_value in def.values) {
-      _stdout_writer.append('  '+enum_value.name.value+';');
+      _stdout_writer.append('  var '+enum_value.name.value+' = "${enum_value.name.value}";');
     }
     _stdout_writer.append('}');
   }

@@ -30,7 +30,7 @@ class StarWarsTest extends BuddySuite
 
       it("...and the Haxe code has the expected types...", {
         haxe.should.contain('typedef Character');
-        haxe.should.contain('enum LengthUnit');
+        haxe.should.contain('@:enum abstract LengthUnit');
         haxe.should.contain('typedef Human');
         haxe.should.contain('typedef Droid');
         haxe.should.contain('typedef Args_Droid_friendsConnection');

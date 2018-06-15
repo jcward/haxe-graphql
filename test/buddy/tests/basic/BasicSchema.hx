@@ -59,7 +59,7 @@ type Person {
         haxe.should.contain('typedef Query');
         haxe.should.contain('typedef Mutation');
         haxe.should.contain('typedef Person');
-        haxe.should.contain('enum InsertResult');
+        haxe.should.contain('@:enum abstract InsertResult');
       });
 
       it("should generate an arg type for mutation insert", {

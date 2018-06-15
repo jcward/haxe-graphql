@@ -55,8 +55,8 @@ type Dog implements INamed {
         haxe.should.contain('typedef Dog');
         haxe.should.contain('typedef INamed');
         haxe.should.contain('abstract Date');
-        haxe.should.contain('enum Greetings');
-        haxe.should.contain('Salutations;');
+        haxe.should.contain('@:enum abstract Greetings');
+        haxe.should.contain('"Salutations"');
       });
 
       it("should generate proper optional typedef fields", {
