@@ -437,6 +437,106 @@ class HaxeGenerator
     }
   }
 
+  function parse_op_for_fragment_unions(root_schema:SchemaMap,
+                                        root:ASTDefs.DocumentNode,
+                                        op_name:String,
+                                        query_root_name:String,
+                                        def:ASTDefs.OperationDefinitionNode):Void
+  {
+    // _stdout_writer.append('typedef OP_${ op_name }_Result = {');
+    // handle_selection_set(op_name, def.selectionSet, [ query_root_name ], true);
+    // _stdout_writer.append('}');
+  }
+
+  function gen_fragment_union(op_name:String,
+                              sel_set:{ selections:Array<SelectionNode> },
+                              type_path:Array<String>)
+  {
+    trace(op_name);
+    trace(type_path);
+    trace(sel_set);
+    #if (js && debug) js.Lib.debug(); #end
+
+    _stdout_writer.append('/* union for Query $op_name fragments at ${ type_path.join(".") } */');
+    var union_name = 'QFrag_${ op_name }_${ type_path.join("_") }';
+    var ud:UnionTypeDefinitionNode = {
+        kind:Kind.UNION_TYPE_DEFINITION,
+        name:{ value:union_name, kind:Kind.NAME },
+        types:[]
+    };
+    var frags = sel_set.selections.filter(function(sel_node) return sel_node.kind.indexOf('Fragment')>=0);
+
+    throw 'ARG, pick up fragment work here...';
+
+    // It gets recursive, so we need to fix the issue of global _stdout_writer / side-effects :(
+
+    // ud.
+    // for (sel_node in sel_set) {
+    //   sel
+    // ud.types.push
+    // write_union_as_haxe_abstract(ud);
+
+  }
+
+  function handle_selection_set(op_name:String,
+                                sel_set:{ selections:Array<SelectionNode> },
+                                type_path:Array<String>, // always abs
+                                is_gen_fragments:Bool=false,
+                                indent=1)
+  {
+    if (sel_set==null || sel_set.selections==null) {
+      // Nothing left to do...
+    }
+
+    // No output for is_gen_fragments
+    var output = is_gen_fragments ? new StringWriter() : _stdout_writer;
+
+    var ind:String = '';
+    for (i in 0...indent) ind += '  ';
+
+    // If selection set has a fragment, it's result is a union type
+    var has_fragment = sel_set.selections.find(function(sel_node) return sel_node.kind.indexOf('Fragment')>=0)!=null;
+    if (has_fragment && is_gen_fragments) {
+      throw 'TODO: FragmentSpread InlineFragment';
+      gen_fragment_union(op_name, sel_set, type_path);
+    }
+
+    for (sel_node in sel_set.selections) {
+      switch (sel_node.kind) { // FragmentSpead | Field | InlineFragment
+      case Kind.FIELD:
+        var field_node:FieldNode = cast sel_node;
+
+        var name:String = field_node.name.value;
+        var alias:String = field_node.alias==null ? name : field_node.alias.value;
+
+        var next_type_path = type_path.slice(0);
+        next_type_path.push(name);
+        switch resolve_type_path(next_type_path, op_name) {
+          case ROOT: throw 'Type path ${ type_path.join(",") } in query ${ op_name } should not resolve to root!';
+          case LEAF(str, opt):
+            if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
+            var prefix = ind + (opt ? "?" : "");
+            output.append('${ prefix }${ alias }:${ str },');
+          case TYPE(str, opt, list):
+            if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
+            var prefix = ind + (opt ? "?" : "");
+            var suffix1 = (list ? 'Array<{' : '{') + ' /* subset of ${ str } */';
+            var suffix2 = (list ? '}>,' : '},');
+            output.append('$prefix$alias:$suffix1');
+            handle_selection_set(op_name, field_node.selectionSet, [ str ], is_gen_fragments, indent+1);
+            output.append('$ind$suffix2');
+          }
+  
+        default:
+          throw 'Unhandled SelectionNode kind: ${ sel_node.kind } (TODO: FragmentSpread InlineFragment)';
+          if (is_gen_fragments) {
+          } else {
+          }
+
+      }
+    }
+  }
+
   function write_operation_def_result(root_schema:SchemaMap,
                                       root:ASTDefs.DocumentNode,
                                       def:ASTDefs.OperationDefinitionNode):OpVariables
@@ -451,52 +551,13 @@ class HaxeGenerator
 
     var types:haxe.DynamicAccess<Dynamic> = {};
 
-    function handle_selection_set(sel_set:{ selections:Array<SelectionNode> },
-                                  type_path:Array<String>, // always abs
-                                  indent=1) {
-      if (sel_set==null || sel_set.selections==null) {
-        // Nothing left to do...
-      }
- 
-      var ind:String = '';
-      for (i in 0...indent) ind += '  ';
-
-      for (sel_node in sel_set.selections) {
-        switch (sel_node.kind) { // FragmentSpead | Field | InlineFragment
-          case Kind.FIELD:
-            var field_node:FieldNode = cast sel_node;
-
-            var name:String = field_node.name.value;
-            var alias:String = field_node.alias==null ? name : field_node.alias.value;
-
-            var next_type_path = type_path.slice(0);
-            next_type_path.push(name);
-            switch resolve_type_path(next_type_path, op_name) {
-              case ROOT: throw 'Type path ${ type_path.join(",") } in query ${ op_name } should not resolve to root!';
-              case LEAF(str, opt):
-                if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
-                var prefix = ind + (opt ? "?" : "");
-                _stdout_writer.append('${ prefix }${ alias }:${ str },');
-              case TYPE(str, opt, list):
-                if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
-                var prefix = ind + (opt ? "?" : "");
-                var suffix1 = (list ? 'Array<{' : '{') + ' /* subset of ${ str } */';
-                var suffix2 = (list ? '}>,' : '},');
-                _stdout_writer.append('$prefix$alias:$suffix1');
-                handle_selection_set(field_node.selectionSet, [ str ], indent+1);
-                _stdout_writer.append('$ind$suffix2');
-            }
-
-          default: throw 'Unhandled SelectionNode kind: ${ sel_node.kind } (TODO: FragmentSpread InlineFragment)';
-        }
-      }
-    }
- 
     var query_root_name = (root_schema==null || root_schema.query_type==null) ? 'Query' : root_schema.query_type;
     // var query_root = get_obj_of(root.definitions, query_root, 'Document');
 
+    parse_op_for_fragment_unions(root_schema, root, op_name, query_root_name, def);
+
     _stdout_writer.append('typedef OP_${ op_name }_Result = {');
-    handle_selection_set(def.selectionSet, [ query_root_name ]);
+    handle_selection_set(op_name, def.selectionSet, [ query_root_name ]);
     _stdout_writer.append('}');
 
     return { op_name:op_name, variables:def.variableDefinitions };
