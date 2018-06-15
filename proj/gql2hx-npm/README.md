@@ -22,6 +22,7 @@ Development sponsored by: [www.wootmath.com](https://www.wootmath.com) [simbulus
 Release notes: 
 ---
 
+ 0.0.12 - Enums now generate @:enum abstract(String) / issue #22  
  0.0.11 - Removed typedef 'extension' notion for interfaces - see fa538e5  
  0.0.10 - Added -p option for --parse-only  
  0.0.9  - Generate query vars type (also renamed prefixes/suffixes)  

@@ -23,60 +23,47 @@ class Test
 
     var source = '
 
+# Creates typedefs for all schema types
+
 schema {
   query: MyQueries
 }
 
-interface HasName {
-  name:String!
+scalar Date
+
+enum ReleaseStatus {
+  PRE_PRODUCTION
+  IN_PRODUCTION
+  RELEASED
 }
 
-union Being = Person | Dog
+interface IHaveID {
+  id:ID!
+}
 
-interface Job {
+type FilmData implements IHaveID {
+  id:ID!
   title:String!
-}
-
-type Plumber implements Job {
-  title:String!
-  plumber_id:ID!
-}
-
-type Person implements HasName {
-  person_id:ID!
-  name:String!
-  job:Job
-}
-
-type Dog implements HasName {
-  dog_id:ID!
-  name:String!
+  director:String
+  releaseDate:Date
+  releaseStatus:ReleaseStatus
 }
 
 type MyQueries {
-  by_name(name:String!): [ HasName ]
+  film: [FilmData]
 }
 
-query ByName($$name:String!) {
-  by_name(name: $$name) {
-    name
+# Creates query response typedefs
 
-    ... on Person {
-      person_id
-
-      job {
-        title
-        ... on Plumber {
-          plumber_id
-        }
-      }
-    }
-
-    ... on Dog {
-      dog_id
-    }
+query GetFilmsByDirector($$director: String) {
+  film(director: $$director) {
+    title
+    director
+    releaseDate
   }
 }
+
+
 
 ';
 
