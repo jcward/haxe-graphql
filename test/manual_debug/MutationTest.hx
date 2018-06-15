@@ -24,7 +24,7 @@ class Test
     var source = '
 
 schema {
-  query: MyQueries
+  mutation: MyMutations
 }
 
 interface HasName {
@@ -53,34 +53,25 @@ type Dog implements HasName {
   name:String!
 }
 
-query ByName($$name:String!) {
-  by_name(name: $$name) {
-    name
+# - - Mutations - -
 
-##    ... on Person {
-##
-##      ...PersonDetails
-## 
-##      job {
-##        title
-##        ... on Plumber {
-##          plumber_id
-##        }
-##      }
-##    }
-## 
-##    ... on Dog {
-##      dog_id
-##    }
-
-  }
+type MyMutations {
+  insert_person(person:Person!): Person
 }
 
+input JobInput {
+  title:String!
+}
 
-## TODO: Named fragment (DRY)
-## fragment PersonDetails on Person {
-##   person_id
-## }
+input PersonInput {
+  person_id:ID!
+  name:String!
+  job:JobInput
+}
+
+mutation InsertPerson($$input: PersonInput!) {
+  insert_person(input: $$input) { person { id } }
+}
 
 ';
 
