@@ -23,54 +23,24 @@ class Test
 
     var source = '
 
-schema {
-  mutation: MyMutations
+type Query {
+  by_title(title:String!): [FilmData]
 }
 
-interface HasName {
-  name:String!
+type FilmData {
+  id: ID!
+  title: String
+  related_films: [ID]
+  tag_list: [String]!
 }
 
-union Being = Person | Dog
-
-interface Job {
-  title:String!
-}
-
-type Plumber implements Job {
-  title:String!
-  plumber_id:ID!
-}
-
-type Person implements HasName {
-  person_id:ID!
-  name:String!
-  job:Job
-}
-
-type Dog implements HasName {
-  dog_id:ID!
-  name:String!
-}
-
-# - - Mutations - -
-
-type MyMutations {
-  insert_person(person:Person!): Person
-}
-
-input JobInput {
-  title:String!
-}
-
-input PersonInput {
-  person_id:ID!
-  name:String!
-  job:JobInput
-}
-
-mutation InsertPerson($$input: PersonInput!) {
-  insert_person(input: $$input) { person_id }
+query FilmsByTitle($$title: String!) {
+  by_title(title:$$title) {
+    id
+    title
+    related_films
+    tag_list
+  }
 }
 
 ';

@@ -442,7 +442,7 @@ class HaxeGenerator
     var resolved = type_map[type_string];
     if (resolved==null) throw '${ err_prefix }Resolved ${ orig_path } to unknown type ${ type_string }';
     if (resolved.fields==null) {
-      return LEAF(type_string, is_opt);
+      return LEAF(type_string, is_opt, is_list);
     } else {
       return TYPE(type_string, is_opt, is_list);
     }
@@ -524,10 +524,11 @@ class HaxeGenerator
         next_type_path.push(name);
         switch resolve_type_path(next_type_path, op_name) {
           case ROOT: throw 'Type path ${ type_path.join(",") } in operation ${ op_name } should not resolve to root!';
-          case LEAF(str, opt):
+          case LEAF(str, opt, is_list):
             if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
             var prefix = ind + (opt ? "?" : "");
-            output.append('${ prefix }${ alias }:${ str },');
+            var leaf_type = is_list ? 'Array<$str>' : str;
+            output.append('${ prefix }${ alias }:${ leaf_type },');
           case TYPE(str, opt, list):
             if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
             var prefix = ind + (opt ? "?" : "");
@@ -606,7 +607,7 @@ class HaxeGenerator
 
 enum ResolvedTypePath {
   ROOT;
-  LEAF(str:String, optional:Bool);
+  LEAF(str:String, optional:Bool, is_list:Bool);
   TYPE(str:String, optional:Bool, is_list:Bool);
 }
 
