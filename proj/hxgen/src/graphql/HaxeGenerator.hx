@@ -31,7 +31,6 @@ typedef SomeNamedNode = { kind:String, name:NameNode };
 @:expose
 class HaxeGenerator
 {
-  private var _stdout_writer:StringWriter;
   private var _stderr_writer:StringWriter;
   private var _interfaces = new StringMapAA<InterfaceType>();
   private var _options:HxGenOptions;
@@ -39,8 +38,6 @@ class HaxeGenerator
   private var _defined_types = [];
   private var _referenced_types = [];
   private var _types_by_name = new StringMapAA<GQLTypeDefinition>();
-
-  private var _op_type_definitions = new StringMapAA<GQLStructTypeDef>();
 
   public static function parse(doc:DocumentNode,
                                ?options:HxGenOptions,
@@ -68,7 +65,6 @@ class HaxeGenerator
   // helper (above).
   private function new(?options:HxGenOptions)
   {
-    _stdout_writer = new StringWriter();
     _stderr_writer = new StringWriter();
     init_options(options);
   }
@@ -116,8 +112,6 @@ class HaxeGenerator
     // Parse definitions
     init_base_types();
 
-    function newline() _stdout_writer.append('');
-
     var root_schema:SchemaMap = null;
 
     // First pass: parse interfaces and schema def only
@@ -135,7 +129,6 @@ class HaxeGenerator
         case ASTDefs.Kind.SCHEMA_DEFINITION:
           if (root_schema!=null) error('Error: cannot specify two schema definitions');
           root_schema = write_schema_def(cast def);
-          newline();
         case _:
       }
     }
@@ -147,28 +140,22 @@ class HaxeGenerator
         // null op, handled above
       case ASTDefs.Kind.SCALAR_TYPE_DEFINITION:
         write_haxe_scalar(cast def);
-        newline();
       case ASTDefs.Kind.ENUM_TYPE_DEFINITION:
         write_haxe_abstract_enum(cast def);
-        newline();
       case ASTDefs.Kind.OBJECT_TYPE_DEFINITION:
         var args = write_haxe_typedef(cast def);
-        newline();
         handle_args([get_def_name(cast def)], args);
       case ASTDefs.Kind.UNION_TYPE_DEFINITION:
         write_union_as_haxe_abstract(cast def);
-        newline();
       case ASTDefs.Kind.OPERATION_DEFINITION:
         // No-op, still generating type map
       case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
         // TODO: anything special about Interfaces ?
         var args = write_haxe_typedef(cast def);
-        newline();
         handle_args([get_def_name(cast def)], args);
       case ASTDefs.Kind.INPUT_OBJECT_TYPE_DEFINITION:
         // TODO: anything special about InputObjectTypeDefinition ?
         var args = write_haxe_typedef(cast def);
-        newline();
         handle_args([get_def_name(cast def)], args);
       default:
         var name = (cast def).name!=null ? (' - '+(cast def).name.value) : '';
@@ -180,7 +167,6 @@ class HaxeGenerator
     for (def in doc.definitions) switch def.kind {
       case ASTDefs.Kind.OPERATION_DEFINITION:
         var vars = write_operation_def_result(root_schema, doc, cast def);
-        newline();
         handle_variables(vars);
       default:
     }
@@ -193,18 +179,19 @@ class HaxeGenerator
 
   private function get_def_name(def) return def.name.value;
 
-  public function toString() return _stdout_writer.toString();
-
   private function error(s:String) _stderr_writer.append(s);
 
   function type_referenced(name) {
     if (_referenced_types.indexOf(name)<0) _referenced_types.push(name);
   }
 
-  function define_type(name:String, fields:StringMapAA<GQLFieldType>=null) {
+  function define_type(t:GQLTypeDefinition) {
+    var name = switch t {
+      case TBasic(name) | TEnum(name, _) | TScalar(name) | TUnion(name, _) | TStruct(name, _): name;
+    }
     if (_defined_types.indexOf(name)<0) {
       _defined_types.push(name);
-      _types_by_name[name] = { name:name, fields:fields };
+      _types_by_name[name] = t;
     } else {
       throw 'Cannot define type $name twice!';
     }
@@ -212,33 +199,30 @@ class HaxeGenerator
 
   function parse_field_type(type:ASTDefs.TypeNode, parent:ASTDefs.TypeNode=null):GQLFieldType
   {
-    var base_type:GQLFieldType = null;
+    var field_type:GQLFieldType = { type:null, is_array:false, is_optional:false };
+
     function has_kind(kind:String, type:ASTDefs.TypeNode):Bool {
       if (type==null) return false;
       if (type.kind==kind) return true;
-      if (type.kind==ASTDefs.Kind.NAMED_TYPE) base_type = { name:type.name.value, is_array:false, is_optional:false };
+      if (type.kind==ASTDefs.Kind.NAMED_TYPE) field_type.type = TPath(type.name.value);
       return has_kind(kind, type.type); // recurse
     }
 
-    var is_array = has_kind(ASTDefs.Kind.LIST_TYPE, type);
-    var non_optional = has_kind(ASTDefs.Kind.NON_NULL_TYPE, type);
-    has_kind('__find_base__', type);
+    field_type.is_array = has_kind(ASTDefs.Kind.LIST_TYPE, type);
+    field_type.is_optional = type.kind!=ASTDefs.Kind.NON_NULL_TYPE;
+    has_kind(' find base ', type);
 
-    if (base_type==null) throw 'Did not find a base type!';
-    base_type.is_array = is_array;
-    base_type.is_optional = !non_optional;
-
-    return base_type;
+    if (field_type.type==null) throw 'Did not find the base type!';
+    return field_type;
   }
 
   /* -- TODO: REVIEW: http://facebook.github.io/graphql/October2016/#sec-Object-type-validation
                       sub-typing seems to be allowed... */
-  function type0_equal_to_type1(type0:GQLFieldType, type1:GQLFieldType):Bool
+  function field_types_equivalent(field_type_0:GQLFieldType, field_type_1:GQLFieldType):Bool
   {
-    // trace('STC: '+type0.toString(true)+' == '+type1.toString(true));
-    return type0.name==type1.name &&
-          type0.is_array==type1.is_array &&
-          type0.is_optional==type1.is_optional;
+    return field_type_0.is_array==field_type_1.is_array &&
+           field_type_0.is_optional==field_type_1.is_optional &&
+           field_type_0.type==field_type_1.type;
   }
 
   /**
@@ -251,9 +235,6 @@ class HaxeGenerator
     // TODO: cli args for:
     //  - long vs short typedef format
     var short_format = true;
-
-    // trace('Generating typedef: '+def.name.value);
-    _stdout_writer.append('typedef '+def.name.value+' = {');
 
     var interface_fields_from = new StringMapAA<String>();
     var skip_interface_fields = new StringMapAA<ComplexType>();
@@ -271,7 +252,7 @@ class HaxeGenerator
 //          } else {
 //            // Two interfaces could imply the same field name... in which
 //            // case we need to ensure the "more specific" definition is kept.
-//            if (!type0_equal_to_type1(intf.get(field_name), skip_interface_fields[field_name])) {
+//            if (!field_types_equivalent(intf.get(field_name), skip_interface_fields[field_name])) {
 //              throw 'Type '+def.name.value+' inherits field '+field_name+' from multiple interfaces ('+ifname+', '+interface_fields_from[field_name]+'), the types of which do not match.';
 //            }
 //          }
@@ -280,7 +261,7 @@ class HaxeGenerator
 //    }
 
     var fields = new StringMapAA<GQLFieldType>();
-    define_type(def.name.value, fields);
+    define_type(TStruct(def.name.value, fields));
 
     for (field in def.fields) {
       // if (field.name.value=='id') debugger;
@@ -294,7 +275,7 @@ class HaxeGenerator
 /*
       if (skip_interface_fields.exists(field_name)) {
         // Field is inherited from an interface, ensure the types match
-        if (!type0_equal_to_type1(type, skip_interface_fields.get(field_name))) {
+        if (!field_types_equivalent(type, skip_interface_fields.get(field_name))) {
           throw 'Type '+def.name.value+' defines '+field_name+':'+type.toString(true)+', but Interface '+interface_fields_from[field_name]+' requires '+field_name+':'+interface_fields_from[field_name].toString();
         }
       } else {
@@ -361,46 +342,51 @@ class HaxeGenerator
 
   function write_haxe_abstract_enum(def:ASTDefs.EnumTypeDefinitionNode) {
     // trace('Generating enum: '+def.name.value);
-    define_type(def.name.value);
-    _stdout_writer.append('@:enum abstract '+def.name.value+'(String) {');
+    var values = [];
+    define_type(TEnum(def.name.value, values));
     for (enum_value in def.values) {
-      _stdout_writer.append('  var '+enum_value.name.value+' = "${enum_value.name.value}";');
+      values.push(enum_value.name.value);
     }
-    _stdout_writer.append('}');
   }
 
   function write_haxe_scalar(def:ASTDefs.ScalarTypeDefinitionNode) {
     // trace('Generating scalar: '+def.name.value);
-    define_type(def.name.value);
-    _stdout_writer.append('/* scalar ${ def.name.value } */\nabstract ${ def.name.value }(Dynamic) { }');
+    define_type(TScalar(def.name.value));
+    //_stdout_writer.append('/* scalar ${ def.name.value } */\nabstract ${ def.name.value }(Dynamic) { }');
   }
 
   function write_union_as_haxe_abstract(def:ASTDefs.UnionTypeDefinitionNode) {
     // trace('Generating union (enum): '+def.name.value);
-    define_type(def.name.value);
-    var union_types_note = def.types.map(function(t) return t.name.value).join(" | ");
-    _stdout_writer.append('/* union '+def.name.value+' = ${ union_types_note } */');
-    _stdout_writer.append('abstract '+def.name.value+'(Dynamic) {');
+    var values = [];
+    define_type(TUnion(def.name.value, values));
+    //var union_types_note = def.types.map(function(t) return t.name.value).join(" | ");
+    //_stdout_writer.append('/* union '+def.name.value+' = ${ union_types_note } */');
+    //_stdout_writer.append('abstract '+def.name.value+'(Dynamic) {');
+    //for (type in def.types) {
+    //  if (type.name==null) throw 'Expecting Named Type';
+    //  var type_name = type.name.value;
+    //  type_referenced(def.name.value);
+    //  _stdout_writer.append(' @:from static function from${ type_name }(v:${ type_name }) return cast v;');
+    //}
+    //_stdout_writer.append('}');
+
     for (type in def.types) {
       if (type.name==null) throw 'Expecting Named Type';
-      var type_name = type.name.value;
-      type_referenced(def.name.value);
-      _stdout_writer.append(' @:from static function from${ type_name }(v:${ type_name }) return cast v;');
+      values.push(type.name.value);
     }
-    _stdout_writer.append('}');
   }
 
   // A schema definition is just a mapping / typedef alias to specific types
   function write_schema_def(def:ASTDefs.SchemaDefinitionNode):SchemaMap {
     var rtn = { query_type:null, mutation_type:null };
 
-    _stdout_writer.append('/* Schema: */');
+    //_stdout_writer.append('/* Schema: */');
     for (ot in def.operationTypes) {
       var op = Std.string(ot.operation);
       switch op {
         case "query" | "mutation": //  | "subscription": is "non-spec experiment"
         var capitalized = op.substr(0,1).toUpperCase() + op.substr(1);
-        _stdout_writer.append('typedef Schema${ capitalized }Type = ${ ot.type.name.value };');
+        //_stdout_writer.append('typedef Schema${ capitalized }Type = ${ ot.type.name.value };');
         if (op=="query") rtn.query_type = ot.type.name.value;
         if (op=="mutation") rtn.mutation_type = ot.type.name.value;
         default: throw 'Unexpected schema operation: ${ op }';
@@ -410,38 +396,48 @@ class HaxeGenerator
     return rtn;
   }
 
-  function resolve_type_path(path:Array<String>, ?op_name:String):{ last_tf:GQLFieldType, type:GQLTypeDefinition }
+  function resolve_type(t:GQLTypeRef):GQLTypeDefinition return switch (t) {
+    case TPath(name):_types_by_name.get(name);
+    case TAnon(def): def;
+  }
+
+  function resolve_field(path:Array<String>, ?op_name:String):GQLFieldType
   {
     var ptr:GQLTypeDefinition = null;
 
     var err_prefix = op_name!=null ? 'Error processing operation ${ op_name }: ' : "";
 
     var orig_path = path.join('.');
-    var last_tf = null;
     while (path.length>0) {
       var name = path.shift();
-      if (ptr==null) { // at root
+      if (ptr==null) { // select from root types
         ptr = _types_by_name.get(name);
         if (ptr==null) throw '${ err_prefix }Didn\'t find root type ${ name } while resolving ${ orig_path }';
+        if (path.length==0) return { is_array:false, is_optional:false, type:TPath(name) };
       } else {
-        if (ptr.fields==null) throw '${ err_prefix }Expecting type ${ ptr.name } to have fields --> ${ name }!';
-        last_tf = ptr.fields.get(name);
-        if (last_tf==null) throw '${ err_prefix }Expecting type ${ ptr.name } to have field ${ name }!';
-
-        // GraphQL query type paths don't care about array / optional
-        ptr = _types_by_name.get(last_tf.name);
-        if (ptr==null) throw '${ err_prefix }Didn\'t find expected root type ${ last_tf.name }';
+        switch ptr {
+          case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
+            throw '${ err_prefix }Expecting type ${ tname } to have field ${ name }!';
+          case TStruct(tname, fields):
+            var field = fields[name];
+            if (field==null) throw '${ err_prefix }Expecting type ${ tname } to have field ${ name }!';
+            if (path.length==0) return field;
+            ptr = resolve_type(field.type);
+            if (ptr==null) throw '${ err_prefix }Did not find type ${ field.type } referenced by ${ tname }.${ name }!';
+          case TUnion(tname, _):
+            throw 'TODO: deterimne if graphql lets you poke down into common fields of unions...';
+        }
       }
     }
 
-    return { last_tf:last_tf, type:ptr };
+    throw '${ err_prefix }couldn\'t resolve path: ${ orig_path }';
 
-    // trace('Looking for ${ orig_path }, last_tf was ${ last_tf }');
-    // return last_tf;
+    // trace('Looking for ${ orig_path }, last_field was ${ last_field }');
+    // return last_field;
     /*
-    var is_list = last_tf.is_array();
-    var is_opt = last_tf.is_optional();
-    var type_string:String = is_list ? array_inner_type(last_tf) : last_tf.toString();
+    var is_list = last_field.is_array();
+    var is_opt = last_field.is_optional();
+    var type_string:String = is_list ? array_inner_type(last_field) : last_field.toString();
 
     var resolved = _types_by_name[type_string];
     if (resolved==null) throw '${ err_prefix }Resolved ${ orig_path } to unknown type ${ type_string }';
@@ -473,7 +469,7 @@ class HaxeGenerator
     trace(sel_set);
     #if (js && debug) js.Lib.debug(); #end
 
-    _stdout_writer.append('/* union for operation $op_name fragments at ${ type_path.join(".") } */');
+    // _stdout_writer.append('/* union for operation $op_name fragments at ${ type_path.join(".") } */');
     var union_name = 'QFrag_${ op_name }_${ type_path.join("_") }';
     var ud:UnionTypeDefinitionNode = {
         kind:Kind.UNION_TYPE_DEFINITION,
@@ -498,27 +494,27 @@ class HaxeGenerator
                                                 op_name:String,
                                                 sel_set:{ selections:Array<SelectionNode> },
                                                 type_path:Array<String>, // always abs
-                                                is_gen_fragments:Bool=false):GQLStructTypeDef
+                                                depth:Int=0):GQLTypeDefinition
   {
     if (sel_set==null || sel_set.selections==null) {
       // Nothing left to do...
     }
 
-    inline function init_struct_fields() return new StringMapAA< OneOf< GQLFieldType, GQLStructTypeDef > >();
-
     // No output for is_gen_fragments
-    var fields = init_struct_fields();
-    var struct_type = { name:type_name, fields:fields };
+    var fields = new StringMapAA<GQLFieldType>();
 
-    // Store in output list ?? Always? Sub types?
-    _op_type_definitions[type_name] = struct_type;
+    // Store it now?
+    define_type(TStruct(type_name, fields));
+
+    // Only store in globally if it's a union...
+    // _op_type_definitions[type_name] = struct_type;
 
     // If selection set has a fragment, it's result is a union type
-    var has_fragment = sel_set.selections.find(function(sel_node) return sel_node.kind.indexOf('Fragment')>=0)!=null;
-    if (has_fragment && is_gen_fragments) {
-      throw 'TODO: FragmentSpread InlineFragment';
-      gen_fragment_union(op_name, sel_set, type_path);
-    }
+    //var has_fragment = sel_set.selections.find(function(sel_node) return sel_node.kind.indexOf('Fragment')>=0)!=null;
+    //if (has_fragment && is_gen_fragments) {
+    //  throw 'TODO: FragmentSpread InlineFragment';
+    //  gen_fragment_union(op_name, sel_set, type_path);
+    //}
 
     for (sel_node in sel_set.selections) {
       switch (sel_node.kind) { // FragmentSpead | Field | InlineFragment
@@ -530,26 +526,36 @@ class HaxeGenerator
 
         var next_type_path = type_path.slice(0);
         next_type_path.push(name);
-        var resolved = resolve_type_path(next_type_path, op_name);
+        var resolved = resolve_field(next_type_path, op_name);
+        var type = resolve_type(resolved.type);
 
-        if (resolved.type.fields==null) { // Leaf type, e.g. String, Int, a scalar, etc
-          if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ resolved.type.name } in ${ type_path.join(",") } of operation ${ op_name }';
-          var nt:GQLFieldType = resolved.last_tf;
-          fields[alias] = nt;
-        } else {
-          if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ resolved.type.name } in ${ type_path.join(",") } of operation ${ op_name }';
-          var sub_type_name = type_name+'_'+resolved.type.name;
-          var sub_type:GQLStructTypeDef = generate_type_based_on_selection_set(op_name, sub_type_name, field_node.selectionSet, [ resolved.type.name ], is_gen_fragments);
-          /*if (sub_type.has_union_field()) {
-            
-          } else { // merge into my type */
-            fields[alias] = sub_type;
-       /* } */
+        switch type {
+          case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
+            if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
+            fields[alias] = resolved;
+          case TStruct(tname, tfields):
+            if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
+            var sub_type_name = depth==0 ? StringTools.replace(type_name, '_Result', '_InnerResult') : type_name+'__'+name;
+
+            var sub_type = generate_type_based_on_selection_set(sub_type_name, op_name, field_node.selectionSet, [ tname ], depth+1);
+            var f = { type:null, is_array:resolved.is_array, is_optional:resolved.is_optional };
+            fields[alias] = f;
+            /*if (sub_type.has_union_field()) {
+            } else */if (depth==0) { // Make separate, named type for first-level of query
+              f.type = TPath(sub_type_name);
+            } else { // merge into my type
+              _types_by_name.remove(sub_type_name);
+              f.type = TAnon(sub_type);
+            }
+          case TUnion(tname, _):
+            if (field_node.selectionSet!=null) throw 'Hmm, do we allow specifying sub-fields of union ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
+            fields[alias] = resolved;
         }
       }
     }
 
-    return struct_type;
+    
+    return _types_by_name[type_name];
   }
 
   function write_operation_def_result(root_schema:SchemaMap,
@@ -560,7 +566,7 @@ class HaxeGenerator
 
     var op_name = def.name.value;
 
-    _stdout_writer.append('/* Operation def: ${ op_name } */');
+    //_stdout_writer.append('/* Operation def: ${ op_name } */');
 
     var op_root_type = '';
     if (def.operation=='query') {
@@ -579,12 +585,6 @@ class HaxeGenerator
                                          def.selectionSet,
                                          [ op_root_type ]);
 
-    /*
-    _stdout_writer.append('typedef OP_${ op_name }_Result = {');
-    handle_selection_set(op_name, def.selectionSet, [ op_root_type ]);
-    _stdout_writer.append('}');
-    */
-
     return { op_name:op_name, variables:def.variableDefinitions };
   }
 
@@ -592,27 +592,18 @@ class HaxeGenerator
     var stdout_writer = new StringWriter();
     stdout_writer.append('/* - - - - Haxe / GraphQL compatibility types - - - - */');
     stdout_writer.append('abstract IDString(String) to String from String {\n  // Relaxed safety -- allow implicit fromString');
-    stdout_writer.append('//  TODO: optional strict safety -- require explicit fromString:');
-    stdout_writer.append('//  public static inline function fromString(s:String) return cast s;');
-    stdout_writer.append('//  public static inline function ofString(s:String) return cast s;');
+    stdout_writer.append('  //  TODO: optional strict safety -- require explicit fromString:');
+    stdout_writer.append('  //  public static inline function fromString(s:String) return cast s;');
+    stdout_writer.append('  //  public static inline function ofString(s:String) return cast s;');
     stdout_writer.append('}');
     stdout_writer.append('typedef ID = IDString;');
-    stdout_writer.append('');
     stdout_writer.append('');
     
     // Print types
     for (name in _types_by_name.keys()) {
+      if (_basic_types.indexOf(name)>=0) continue;
       var type = _types_by_name[name];
       stdout_writer.append( GQLTypeTools.type_to_string(type) );
-      stdout_writer.append('');
-      stdout_writer.append('');
-    }
-
-    // Print operation struct types
-    for (name in _op_type_definitions.keys()) {
-      var type = _op_type_definitions[name];
-      stdout_writer.append( GQLTypeTools.type_to_string(type) );
-      stdout_writer.append('');
       stdout_writer.append('');
     }
 
@@ -623,15 +614,10 @@ class HaxeGenerator
 
   // Init ID type as lenient abstract over String
   // TODO: optional require toIDString() for explicit string casting
+  private static var _basic_types = ['ID', 'String', 'Float', 'Int', 'Bool'];
   function init_base_types() {
     // ID
-    define_type('ID'); // see generated IDString above
-
-    // Compatible with Haxe
-    define_type('String');
-    define_type('Float');
-    define_type('Int');
-    define_type('Bool');
+    for (t in _basic_types) define_type(TBasic(t));
   }
 
 }
@@ -656,20 +642,32 @@ class StringWriter
 }
 
 // These will map to ComplexTypes:
-//  String        --> TPath(anme)                    if not array, not optional
-//  Array<String> --> TPath('Array', [TPath(name)])  if not array, not optional
-//  ?...          --> TOptional(...)                 if optional
+//  String        --> TPath(name)                    if not array, not optional
+//  Array<String> --> TPath('Array', [TPath(name)])  if array
+//  optional adds metadata to field
+enum GQLTypeRef {
+  TPath(name:String);
+  TAnon(type:GQLTypeDefinition);
+}
 typedef GQLFieldType = {
-  name:String, // aka, like a TPath(TypePath), but no pack
+  type:GQLTypeRef, // aka, like a TPath(TypePath), or anon definition
   is_array:Bool,
   is_optional:Bool
 }
 
+enum GQLTypeDefinition {
+  TBasic(name:String);
+  TScalar(name:String);
+  TEnum(name:String, values:Array<String>);
+  TUnion(name:String, type_paths:Array<String>);
+  TStruct(name:String, fields:StringMapAA<GQLFieldType>);
+}
+
 // Will map to Haxe TypeDefinition (fields of FVar(t:ComplexType as above))
-typedef GQLTypeDefinition = { name:String, ?fields:StringMapAA<GQLFieldType> }
+// typedef GQLTypeDefinition = { name:String, type:GQLTypeIdentifier }
 
 // Will map to TAnonymous with nested structure definitions
-typedef GQLStructTypeDef = { name:String, ?fields:StringMapAA<OneOf< GQLFieldType, GQLStructTypeDef>> }
+// typedef GQLStructTypeDef = { name:String, ?fields:StringMapAA<OneOf< GQLFieldType, GQLStructTypeDef>> }
 
 class GQLTypeTools
 {
@@ -679,52 +677,58 @@ class GQLTypeTools
     // TODO: opt_as_meta
     return p.printComplexType(ct);
   }*/
-  public static function to_haxe_field(field_name:String, gql_f:OneOf<GQLFieldType, GQLStructTypeDef>):Field
+
+  public static function to_haxe_field(field_name:String, gql_f:GQLFieldType):Field
   {
-    return switch gql_f {
-      case Left(td):
-        var ct:ComplexType = TPath({ pack:[], name:td.name });
-        if (td.is_array) ct = TPath({ pack:[], name:'Array', params:[ TPType(ct) ] });
+    switch gql_f.type {
+      case TPath(name):
+        var ct:ComplexType = TPath({ pack:[], name:name });
+        if (gql_f.is_array) ct = TPath({ pack:[], name:'Array', params:[ TPType(ct) ] });
         var field = { name:field_name, kind:FVar(ct, null), meta:[], pos:FAKE_POS };
-        if (td.is_optional) field.meta.push({ name:":optional", pos:FAKE_POS });
-        field;
-      case Right(gql_struct_td):
-        var fields = [];
-        var ct:ComplexType = TAnonymous(fields);
-        for (fname in gql_struct_td.fields.keys()) {
-          var inner = gql_struct_td.fields[fname];
+        if (gql_f.is_optional) field.meta.push({ name:":optional", pos:FAKE_POS });
+        return field;
+
+      case TAnon(TStruct(name, inner_fields)):
+        var fields:Array<haxe.macro.Field> = [];
+        for (fname in inner_fields.keys()) {
+          var inner = inner_fields[fname];
           fields.push(to_haxe_field(fname, inner));
         }
-        var field = { name:field_name, kind:FVar(ct, null), meta:[], pos:FAKE_POS };
-        field;
-      
+        var field = { name:field_name, kind:FVar(TAnonymous(fields), null), meta:[], pos:FAKE_POS };
+        return field;
+
+      case TAnon(any): throw 'Non-struct types are not supported in TAnon: ${ any }';
+      //default: throw 'Basic types are not supported in TAnon';
     }
   }
 
-  public static function type_to_string(td:OneOf<GQLTypeDefinition, GQLStructTypeDef>):String {
+  public static function type_to_string(td:GQLTypeDefinition):String {
     var p = new CustomPrinter("  ", true);
     switch td {
-
-      case Left(gql_td): // GQL types
-        if (gql_td.fields==null) return '/* Basic type ${ gql_td.name }*/';
+      case TBasic(tname): return '';
+      case TScalar(tname):
+        return '/* Scalar type ${ tname } */\nabstract ${ tname }(Dynamic) { }';
+      case TEnum(tname, values):
+        return '/* Enum type ${ tname } */\n@:enum abstract ${ tname }(String) {\n  ' +
+          values.map(function(v) return 'var $v = "$v";').join("\n  ")+'\n}';
+      case TStruct(name, fields):
         var haxe_td:TypeDefinition = {
-          pack:[], name:gql_td.name, pos:FAKE_POS, kind:TDStructure, fields:[]
+          pack:[], name:name, pos:FAKE_POS, kind:TDStructure, fields:[]
         };
-        for (field_name in gql_td.fields.keys()) {
-          haxe_td.fields.push( to_haxe_field(field_name, gql_td.fields[field_name]) );
+        for (field_name in fields.keys()) {
+          haxe_td.fields.push( to_haxe_field(field_name, fields[field_name]) );
         }
         return p.printTypeDefinition( haxe_td );
-
-      case Right(gql_struct_td): // GQL query / struct types
-        var haxe_td:TypeDefinition = {
-          pack:[], name:gql_struct_td.name, pos:FAKE_POS, kind:TDStructure, fields:[]
-        };
-        for (field_name in gql_struct_td.fields.keys()) {
-          haxe_td.fields.push( to_haxe_field(field_name, gql_struct_td.fields[field_name]) );
+      case TUnion(tname, type_paths):
+        var writer = new StringWriter();
+        var union_types_note = type_paths.map(function(t) return t).join(" | ");
+        writer.append('/* union '+tname+' = ${ union_types_note } */');
+        writer.append('abstract '+tname+'(Dynamic) {');
+        for (type_name in type_paths) {
+          writer.append(' @:from static function from${ type_name }(v:${ type_name }) return cast v;');
         }
-        return p.printTypeDefinition( haxe_td );
-
-      return 'what';
+        writer.append('}');
+        return writer.toString();
     }
   }
 
