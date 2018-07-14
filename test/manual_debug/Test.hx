@@ -43,6 +43,12 @@ query FilmsByTitle($$title: String!) {
   }
 }
 
+enum A_OR_B {
+  A
+  B
+}
+
+union DaUnion = FilmData | Query
 ';
 
     // var td = 

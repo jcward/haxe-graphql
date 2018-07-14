@@ -50,10 +50,11 @@ type Person {
         parser.document.definitions.length.should.be(5);
       });
 
-      it("should generate the expected schema aliases", {
-        haxe.should.contain('typedef SchemaQueryType = Query');
-        haxe.should.contain('typedef SchemaMutationType = Mutation');
-      });
+      // Hmm, not I'm questioning whether we want / need these...
+      // it("should generate the expected schema aliases", {
+      //   haxe.should.contain('typedef SchemaQueryType = Query');
+      //   haxe.should.contain('typedef SchemaMutationType = Mutation');
+      // });
 
       it("should generate the basic type signatures", {
         haxe.should.contain('typedef Query');

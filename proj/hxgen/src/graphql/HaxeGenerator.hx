@@ -171,6 +171,12 @@ class HaxeGenerator
       default:
     }
 
+    // Ensure all referenced types are defined
+    for (t in _referenced_types) {
+      if (_defined_types.indexOf(t)<0) {
+        error('Error: unknown type: '+t);
+      }
+    }
     return {
       stderr:_stderr_writer.toString(),
       stdout:print_to_stdout()
@@ -204,7 +210,10 @@ class HaxeGenerator
     function has_kind(kind:String, type:ASTDefs.TypeNode):Bool {
       if (type==null) return false;
       if (type.kind==kind) return true;
-      if (type.kind==ASTDefs.Kind.NAMED_TYPE) field_type.type = TPath(type.name.value);
+      if (type.kind==ASTDefs.Kind.NAMED_TYPE) {
+        field_type.type = TPath(type.name.value);
+        type_referenced(type.name.value);
+      }
       return has_kind(kind, type.type); // recurse
     }
 
@@ -596,6 +605,7 @@ class HaxeGenerator
     stdout_writer.append('  //  public static inline function fromString(s:String) return cast s;');
     stdout_writer.append('  //  public static inline function ofString(s:String) return cast s;');
     stdout_writer.append('}');
+    stdout_writer.append('typedef Boolean = Bool; // Workaround for issue #24 - this blocks gql Bool');
     stdout_writer.append('typedef ID = IDString;');
     stdout_writer.append('');
     
@@ -614,7 +624,7 @@ class HaxeGenerator
 
   // Init ID type as lenient abstract over String
   // TODO: optional require toIDString() for explicit string casting
-  private static var _basic_types = ['ID', 'String', 'Float', 'Int', 'Bool'];
+  private static var _basic_types = ['ID', 'String', 'Float', 'Int', 'Boolean'];
   function init_base_types() {
     // ID
     for (t in _basic_types) define_type(TBasic(t));

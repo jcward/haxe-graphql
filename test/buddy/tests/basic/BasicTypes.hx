@@ -25,6 +25,7 @@ type Person implements INamed {
   name : String!
   friends: [Person!]
   birthday: Date
+  bool_test: Boolean
 }
 
 type Dog implements INamed {
@@ -60,11 +61,16 @@ type Dog implements INamed {
       });
 
       it("should generate proper optional typedef fields", {
-        haxe.should.contain('id:');
-        haxe.should.not.contain('?id:');
-        haxe.should.contain('?birthday:');
-        haxe.should.contain('?friends:');
-        haxe.should.not.contain('?name:');
+        haxe.should.contain('id :');
+        haxe.should.not.contain('?id :');
+        haxe.should.contain('?birthday :');
+        haxe.should.contain('?friends :');
+        haxe.should.not.contain('?name :');
+      });
+
+      it("should generate proper optional bool type", {
+        haxe.should.contain('?bool_test : Bool');
+        haxe.should.not.contain('?bool_test : Boolean');
       });
 
     });
