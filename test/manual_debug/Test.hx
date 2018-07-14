@@ -45,6 +45,17 @@ query FilmsByTitle($$title: String!) {
 
 ';
 
+    // var td = 
+    // var p = new haxe.macro.Printer();
+    // trace(p.printTypeDefinition(td));
+    trace(macro :Int);
+    trace(macro :String);
+    trace(macro :Array<String>);
+    trace(macro :Test);
+
+    var p = new haxe.macro.Printer();
+    trace(p.printComplexType( macro :Array<Array<{ a:String, ?b:Int }>> ));
+
     var p = new graphql.parser.Parser(source, { noLocation:true });
     trace(source);
     trace(p.document);

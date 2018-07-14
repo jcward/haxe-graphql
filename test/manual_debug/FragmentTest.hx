@@ -23,10 +23,6 @@ class Test
 
     var source = '
 
-schema {
-  query: MyQueries
-}
-
 interface HasName {
   name:String!
 }
@@ -53,34 +49,42 @@ type Dog implements HasName {
   name:String!
 }
 
+type Query {
+  by_name(name:String!): HasName
+}
+
 query ByName($$name:String!) {
   by_name(name: $$name) {
     name
 
-##    ... on Person {
-##
-##      ...PersonDetails
-## 
-##      job {
-##        title
-##        ... on Plumber {
-##          plumber_id
-##        }
-##      }
-##    }
-## 
-##    ... on Dog {
-##      dog_id
-##    }
+    ... on Person {
+      ...PersonDetails
+ 
+      job {
+        title
+        ... on Plumber {
+          plumber_id
+          ...PlumberDetails
+        }
+      }
+    }
+ 
+    ... on Dog {
+      dog_id
+    }
 
   }
 }
 
 
 ## TODO: Named fragment (DRY)
-## fragment PersonDetails on Person {
-##   person_id
-## }
+fragment PersonDetails on Person {
+  person_id
+}
+
+fragment PlumberDetails on Plumber {
+  plumber_id
+}
 
 ';
 

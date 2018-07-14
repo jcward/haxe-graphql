@@ -3,7 +3,10 @@ package graphql;
 import graphql.ASTDefs;
 import haxe.ds.Either;
 
+import haxe.macro.Expr;
+
 using Lambda;
+using graphql.HaxeGenerator.HaxeTypeTools;
 
 @:enum abstract GenerateOption(String) {
   var TYPEDEFS = 'typedefs';
@@ -21,7 +24,7 @@ typedef SchemaMap = {
 }
 
 // key String is field_name
-typedef InterfaceType = haxe.ds.StringMap<TypeStringifier>;
+typedef InterfaceType = haxe.ds.StringMap<ComplexType>;
 
 typedef SomeNamedNode = { kind:String, name:NameNode };
 
@@ -32,6 +35,10 @@ class HaxeGenerator
   private var _stderr_writer:StringWriter;
   private var _interfaces = new ArrayStringMap<InterfaceType>();
   private var _options:HxGenOptions;
+
+  private var _defined_types = [];
+  private var _referenced_types = [];
+  private var _type_definitions = new ArrayStringMap<{ name:String, ?fields:ArrayStringMap<ComplexType> }>();
 
   public static function parse(doc:DocumentNode,
                                ?options:HxGenOptions,
@@ -178,7 +185,7 @@ class HaxeGenerator
 
     return {
       stderr:_stderr_writer.toString(),
-      stdout:_stdout_writer.toString()
+      stdout:print_to_stdout()
     };
   }
 
@@ -188,46 +195,44 @@ class HaxeGenerator
 
   private function error(s:String) _stderr_writer.append(s);
 
-  private var referenced_types = [];
   function type_referenced(name) {
-    if (referenced_types.indexOf(name)<0) referenced_types.push(name);
+    if (_referenced_types.indexOf(name)<0) _referenced_types.push(name);
   }
 
-  private var defined_types = [];
-  private var type_map = new ArrayStringMap<{ name:String, ?fields:ArrayStringMap<TypeStringifier> }>();
-  function type_defined(name:String, fields:ArrayStringMap<TypeStringifier>=null) {
-    if (defined_types.indexOf(name)<0) defined_types.push(name);
-    type_map[name] = { name:name, fields:fields };
-  }
-
-  function parse_type(type:ASTDefs.TypeNode, parent:ASTDefs.TypeNode=null):TypeStringifier {
-    var is_array = type.kind == ASTDefs.Kind.LIST_TYPE;
-    var non_null = type.kind == ASTDefs.Kind.NON_NULL_TYPE;
-    var wrapper = non_null || is_array;
-
-    var optional = non_null ? false : (parent==null || parent.kind!=ASTDefs.Kind.NON_NULL_TYPE);
-    var rtn:TypeStringifier = { prefix:'', suffix:'', child:null, optional:false };
-
-    if (!wrapper) { // Leaf
-      if (type.name==null) throw 'Expecting type.name!';
-      if (type.type!=null) throw 'Not expecting recursive type!';
-      if (type.kind!=ASTDefs.Kind.NAMED_TYPE) throw 'Expecting NamedType!';
-      type_referenced(type.name.value);
-      rtn.optional = optional;
-      rtn.child = type.name.value;
+  function define_type(name:String, fields:ArrayStringMap<ComplexType>=null) {
+    if (_defined_types.indexOf(name)<0) {
+      _defined_types.push(name);
+      _type_definitions[name] = { name:name, fields:fields };
     } else {
-      if (type.type==null) throw 'Expecting recursive / wrapped type!';
-      rtn.optional = optional;
-      if (is_array) { rtn.prefix += 'Array<'; rtn.suffix += '>'; }
-      rtn.child = parse_type(type.type, type);
+      throw 'Cannot define type $name twice!';
+    }
+  }
+
+  function parse_type(type:ASTDefs.TypeNode, parent:ASTDefs.TypeNode=null):ComplexType
+  {
+    var base_type:ComplexType = null;
+    function has_kind(kind:String, type:ASTDefs.TypeNode):Bool {
+      if (type.kind==kind) return true;
+      if (type.kind==ASTDefs.Kind.NAMED_TYPE) base_type = HaxeTypeTools.ct_from_string(type.name.value);
+      return has_kind(kind, type.type); // recurse
     }
 
-    return rtn;
+    var is_array = has_kind(ASTDefs.Kind.LIST_TYPE, type);
+    var non_optional = has_kind(ASTDefs.Kind.NON_NULL_TYPE, type);
+    has_kind('__find_base__', type);
+
+    if (base_type==null) throw 'Did not find a base type!';
+    if (is_array) {
+      base_type = TPath({ name: 'Array', pack: [], params: [TPType(base_type)] });
+    }
+    if (!non_optional) base_type = TOptional(base_type);
+
+    return base_type;
   }
 
   /* -- TODO: REVIEW: http://facebook.github.io/graphql/October2016/#sec-Object-type-validation
                       sub-typing seems to be allowed... */
-  function type0_equal_to_type1(type0:TypeStringifier, type1:TypeStringifier):Bool
+  function type0_equal_to_type1(type0:ComplexType, type1:ComplexType):Bool
   {
     // trace('STC: '+type0.toString(true)+' == '+type1.toString(true));
     return type0.toString(true)==type1.toString(true);
@@ -248,7 +253,7 @@ class HaxeGenerator
     _stdout_writer.append('typedef '+def.name.value+' = {');
 
     var interface_fields_from = new ArrayStringMap<String>();
-    var skip_interface_fields = new ArrayStringMap<TypeStringifier>();
+    var skip_interface_fields = new ArrayStringMap<ComplexType>();
 
 //    if (def.interfaces!=null) {
 //      for (intf in def.interfaces) {
@@ -271,19 +276,19 @@ class HaxeGenerator
 //      }
 //    }
 
-    var fields = new ArrayStringMap<TypeStringifier>();
-    type_defined(def.name.value, fields);
+    var fields = new ArrayStringMap<ComplexType>();
+    define_type(def.name.value, fields);
 
     for (field in def.fields) {
       // if (field.name.value=='id') debugger;
       var type = parse_type(field.type);
       var field_name = field.name.value;
-      fields[field_name] = type.clone().follow();
+      fields[field_name] = type; //.clone().follow();
 
       if (field.arguments!=null && field.arguments.length>0) {
         args.push({ field:field_name, arguments:field.arguments });
       }
-
+/*
       if (skip_interface_fields.exists(field_name)) {
         // Field is inherited from an interface, ensure the types match
         if (!type0_equal_to_type1(type, skip_interface_fields.get(field_name))) {
@@ -303,10 +308,12 @@ class HaxeGenerator
         }
         _stdout_writer.append('  '+type_str);
       }
+*/
     }
-
+/*
     if (short_format) _stdout_writer.chomp_trailing_comma(); // Haxe doesn't care, but let's be tidy
     _stdout_writer.append('}');
+*/
 
     return args;
   }
@@ -319,7 +326,7 @@ class HaxeGenerator
 //    var name = def.name.value;
 //    if (_interfaces.exists(name)) throw 'Duplicate interface named '+name;
 //
-//    var intf = new ArrayStringMap<TypeStringifier>();
+//    var intf = new ArrayStringMap<ComplexType>();
 //    for (field in def.fields) {
 //      var type = parse_type(field.type);
 //      var field_name = field.name.value;
@@ -341,7 +348,7 @@ class HaxeGenerator
   // TODO: optional?
   // function write_haxe_enum(def:ASTDefs.EnumTypeDefinitionNode) {
   //   // trace('Generating enum: '+def.name.value);
-  //   type_defined(def.name.value);
+  //   define_type(def.name.value);
   //   _stdout_writer.append('enum '+def.name.value+' {');
   //   for (enum_value in def.values) {
   //     _stdout_writer.append('  '+enum_value.name.value+';');
@@ -351,7 +358,7 @@ class HaxeGenerator
 
   function write_haxe_abstract_enum(def:ASTDefs.EnumTypeDefinitionNode) {
     // trace('Generating enum: '+def.name.value);
-    type_defined(def.name.value);
+    define_type(def.name.value);
     _stdout_writer.append('@:enum abstract '+def.name.value+'(String) {');
     for (enum_value in def.values) {
       _stdout_writer.append('  var '+enum_value.name.value+' = "${enum_value.name.value}";');
@@ -361,13 +368,13 @@ class HaxeGenerator
 
   function write_haxe_scalar(def:ASTDefs.ScalarTypeDefinitionNode) {
     // trace('Generating scalar: '+def.name.value);
-    type_defined(def.name.value);
+    define_type(def.name.value);
     _stdout_writer.append('/* scalar ${ def.name.value } */\nabstract ${ def.name.value }(Dynamic) { }');
   }
 
   function write_union_as_haxe_abstract(def:ASTDefs.UnionTypeDefinitionNode) {
     // trace('Generating union (enum): '+def.name.value);
-    type_defined(def.name.value);
+    define_type(def.name.value);
     var union_types_note = def.types.map(function(t) return t.name.value).join(" | ");
     _stdout_writer.append('/* union '+def.name.value+' = ${ union_types_note } */');
     _stdout_writer.append('abstract '+def.name.value+'(Dynamic) {');
@@ -402,12 +409,7 @@ class HaxeGenerator
 
   function resolve_type_path(path:Array<String>, ?op_name:String):ResolvedTypePath
   {
-    var ptr:{ name:String, ?fields:ArrayStringMap<TypeStringifier> } = null;
-
-    function array_inner_type(ts:TypeStringifier):String return switch ts.child {
-      case Left(cts): cts.toString();
-      default: null;
-    } 
+    var ptr:{ name:String, ?fields:ArrayStringMap<ComplexType> } = null;
 
     var err_prefix = op_name!=null ? 'Error processing operation ${ op_name }: ' : "";
 
@@ -415,37 +417,41 @@ class HaxeGenerator
     var last_ts = null;
     while (path.length>0) {
       var name = path.shift();
-      if (ptr==null) {
-        ptr = type_map.get(name);
-        if (ptr==null) throw '${ err_prefix }Didn\'t find root type ${ name }';
+      if (ptr==null) { // at root
+        ptr = _type_definitions.get(name);
+        if (ptr==null) throw '${ err_prefix }Didn\'t find root type ${ name } while resolving ${ orig_path }';
+        if (path.length==0) return FIELD(last_ts);
       } else {
         if (ptr.fields==null) throw '${ err_prefix }Expecting type ${ ptr.name } to have fields --> ${ name }!';
         var ts = ptr.fields.get(name);
         if (ts==null) throw '${ err_prefix }Expecting type ${ ptr.name } to have field ${ name }!';
-        ts = ts.follow();
+        // ts.follow was here... unnecessary?
         last_ts = ts;
-        if (path.length==0) break;
-        var nm:String = ts.child;
-        if (ts.prefix.indexOf('Array')>=0) nm = array_inner_type(ts);
-        if (nm==null) throw '${ err_prefix }Expecting ts to have a name child -- is that not right?';
-        ptr = type_map.get(nm);
+        if (path.length==0) return LEAF(ts);
+
+        // GraphQL skips over array/optional
+        var nm = ts.get_base_type_name();
+        ptr = _type_definitions.get(nm);
         if (ptr==null) throw '${ err_prefix }Didn\'t find expected root type ${ nm }';
       }
     }
 
+    throw 'Failed to resolve type path: $orig_path';
     // trace('Looking for ${ orig_path }, last_ts was ${ last_ts }');
-
-    var is_list = last_ts.prefix.indexOf('Array')>=0;
-    var is_opt = last_ts.optional;
+    // return last_ts;
+    /*
+    var is_list = last_ts.is_array();
+    var is_opt = last_ts.is_optional();
     var type_string:String = is_list ? array_inner_type(last_ts) : last_ts.toString();
 
-    var resolved = type_map[type_string];
+    var resolved = _type_definitions[type_string];
     if (resolved==null) throw '${ err_prefix }Resolved ${ orig_path } to unknown type ${ type_string }';
     if (resolved.fields==null) {
       return LEAF(type_string, is_opt, is_list);
     } else {
       return TYPE(type_string, is_opt, is_list);
     }
+    */
   }
 
   function parse_op_for_fragment_unions(root_schema:SchemaMap,
@@ -489,18 +495,19 @@ class HaxeGenerator
 
   }
 
-  function handle_selection_set(op_name:String,
-                                sel_set:{ selections:Array<SelectionNode> },
-                                type_path:Array<String>, // always abs
-                                is_gen_fragments:Bool=false,
-                                indent=1)
+  function generate_type_based_on_selection_set(type_name:String,
+                                                op_name:String,
+                                                sel_set:{ selections:Array<SelectionNode> },
+                                                type_path:Array<String>, // always abs
+                                                is_gen_fragments:Bool=false,
+                                                indent=1)
   {
     if (sel_set==null || sel_set.selections==null) {
       // Nothing left to do...
     }
 
     // No output for is_gen_fragments
-    var output = is_gen_fragments ? new StringWriter() : _stdout_writer;
+    var fields = new ArrayStringMap<ComplexType>(); //is_gen_fragments ? new StringWriter() : _stdout_writer;
 
     var ind:String = '';
     for (i in 0...indent) ind += '  ';
@@ -523,16 +530,16 @@ class HaxeGenerator
         var next_type_path = type_path.slice(0);
         next_type_path.push(name);
         switch resolve_type_path(next_type_path, op_name) {
-          case ROOT: throw 'Type path ${ type_path.join(",") } in operation ${ op_name } should not resolve to root!';
-          case LEAF(str, opt, is_list):
-            if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
+          case LEAF(ct):
+            if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ ct.toString(false) } in ${ type_path.join(",") } of operation ${ op_name }';
+            fields[alias] = ct;
+          case FIELD(ct): // type_name, opt, is_list):
+            var type_name = ct.get_base_type_name();
+            if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ type_name } in ${ type_path.join(",") } of operation ${ op_name }';
+            handle_selection_set(op_name, field_node.selectionSet, [ str ], is_gen_fragments, indent+1);
+            
             var prefix = ind + (opt ? "?" : "");
-            var leaf_type = is_list ? 'Array<$str>' : str;
-            output.append('${ prefix }${ alias }:${ leaf_type },');
-          case TYPE(str, opt, list):
-            if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ str } in ${ type_path.join(",") } of operation ${ op_name }';
-            var prefix = ind + (opt ? "?" : "");
-            var suffix1 = (list ? 'Array<{' : '{') + ' /* subset of ${ str } */';
+            var suffix1 = (list ? 'Array<{' : '{') + ' /* subset of ${ type_name } */';
             var suffix2 = (list ? '}>,' : '},');
             output.append('$prefix$alias:$suffix1');
             handle_selection_set(op_name, field_node.selectionSet, [ str ], is_gen_fragments, indent+1);
@@ -568,47 +575,66 @@ class HaxeGenerator
       throw 'Error processing ${ op_name }: Only query and mutation are supported.';
     }
 
-    var types:haxe.DynamicAccess<Dynamic> = {};
-
     parse_op_for_fragment_unions(root_schema, root, op_name, op_root_type, def);
 
+    // gen type based on selection set
+    generate_type_based_on_selection_set('OP_${ op_name }_Result',
+                                         op_name,
+                                         def.selectionSet,
+                                         [ op_root_type ]);
+
+    /*
     _stdout_writer.append('typedef OP_${ op_name }_Result = {');
     handle_selection_set(op_name, def.selectionSet, [ op_root_type ]);
     _stdout_writer.append('}');
+    */
 
     return { op_name:op_name, variables:def.variableDefinitions };
+  }
+
+  function print_to_stdout():String {
+    var stdout_writer = new StringWriter();
+    stdout_writer.append('/* - - - - Haxe / GraphQL compatibility types - - - - */');
+    stdout_writer.append('abstract IDString(String) to String from String {\n  // Relaxed safety -- allow implicit fromString');
+    stdout_writer.append('//  TODO: optional strict safety -- require explicit fromString:');
+    stdout_writer.append('//  public static inline function fromString(s:String) return cast s;');
+    stdout_writer.append('//  public static inline function ofString(s:String) return cast s;');
+    stdout_writer.append('}');
+    stdout_writer.append('typedef ID = IDString;');
+    stdout_writer.append('');
+    stdout_writer.append('');
+    
+    // Print types
+    for (ct in _generated_types) {
+      var str = ct.toString(true);
+      stdout_writer.append(str);
+      stdout_writer.append('');
+      stdout_writer.append('');
+    }
+
+    return stdout_writer.toString();
   }
 
   // Init ID type as lenient abstract over String
   // TODO: optional require toIDString() for explicit string casting
   function init_base_types() {
     // ID
-    _stdout_writer.append('/* - - - - Haxe / GraphQL compatibility types - - - - */');
-    _stdout_writer.append('abstract IDString(String) to String from String {\n  // Relaxed safety -- allow implicit fromString');
-    _stdout_writer.append('//  TODO: optional strict safety -- require explicit fromString:');
-    _stdout_writer.append('//  public static inline function fromString(s:String) return cast s;');
-    _stdout_writer.append('//  public static inline function ofString(s:String) return cast s;');
-    _stdout_writer.append('}');
-    _stdout_writer.append('typedef ID = IDString;');
-    type_defined('ID');
+    define_type('ID'); // see generated IDString above
 
     // Compatible with Haxe
-    type_defined('String');
-    type_defined('Float');
-    type_defined('Int');
+    define_type('String');
+    define_type('Float');
+    define_type('Int');
+    define_type('Bool');
 
-    // Aliases for Haxe
-    _stdout_writer.append('typedef Boolean = Bool;');
-    type_defined('Boolean');
     _stdout_writer.append('/* - - - - - - - - - - - - - - - - - - - - - - - - - */\n\n');
   }
 
 }
 
 enum ResolvedTypePath {
-  ROOT;
-  LEAF(str:String, optional:Bool, is_list:Bool);
-  TYPE(str:String, optional:Bool, is_list:Bool);
+  LEAF(ct:ComplexType);
+  FIELD(ct:ComplexType);
 }
 
 class StringWriter
@@ -631,6 +657,59 @@ class StringWriter
 
 }
 
+class HaxeTypeTools
+{
+  public static function ct_from_string(str:String) return switch str {
+    case 'String': macro :String;
+    case 'Int': macro :Int;
+    case 'Float': macro :Float;
+    case 'Boolean': macro :Bool;
+    default: TPath({ name: str, pack: [], params: [] });
+  };
+
+  public static function toString(ct:ComplexType, opt_as_meta:Bool):String
+  {
+    var p = new haxe.macro.Printer();
+    // TODO: opt_as_meta
+    return p.printComplexType(ct);
+  }
+
+  // Ignoring optional and array
+  public static function get_base_type_name(ct:ComplexType)
+  {
+    return switch ct {
+      case TPath({ name:name, pack:pack, params:params }):
+        if (name=='Array') {
+          name = switch params[0] {
+            // case TPType(TPath({ name:n }, _)): n;
+            default: throw 'Unexpected complex type format: $ct';
+          }
+        }
+        name;
+      case TOptional(inner): get_base_type_name(inner);
+      default: throw 'Unexpected complex type format: $ct';
+    }
+  }
+
+  public static function is_optional(ct:ComplexType)
+  {
+    return switch ct {
+      case TOptional(_): true;
+      default: false
+    }
+  }
+
+  public static function is_array(ct:ComplexType)
+  {
+    return switch ct {
+      case TPath({ name:name }): return name=='Array';
+      case TOptional(inner): is_array(inner);
+      default: throw 'Unexpected complex type format: $ct';
+    }
+  }
+
+}
+
 /*
  * GraphQL represents field types as nodes, with lists and non-nullables as
  * parent nodes. So we have a recursive structure to capture that idea:
@@ -643,7 +722,7 @@ class StringWriter
  *
  *   `ListNode { NonNullNode { NamedTypeNode } }`
  *
- * TypeStringifier knows how to build a string out of this recursive structure,
+ * ComplexType knows how to build a string out of this recursive structure,
  * so it gets converted to Haxe as: `Null<Array<SomeItem>>`, or if you choose
  * not to print the nulls, `Array<SomeItem>`, or as a field on a short-hand
  * typedef `?items:Array<SomeItem>` or as a field on a long-hand typedef:
@@ -651,14 +730,14 @@ class StringWriter
  *   `@:optional var items:Array<SomeItem>`
  */
 @:structInit // allows assignment from anon structure with necessary fields
-private class TypeStringifier
+private class TypeZStringifier
 {
   public var prefix:String;
   public var suffix:String;
   public var optional:Bool;
-  public var child:TSChildOrBareString;
+  public var child:TSChildOrComplexType;
 
-  public function new(child:TSChildOrBareString,
+  public function new(child:TSChildOrComplexType,
                       optional=false,
                       prefix:String='',
                       suffix:String='')
@@ -669,18 +748,20 @@ private class TypeStringifier
     this.optional = optional;
   }
 
-  public function toString(optional_as_null=false) {
-    var result = this.prefix + (switch child {
+  public function toString(optional_as_null=false):String {
+    var result:String = this.prefix + (switch child {
       case Left(ts): ts.toString(optional_as_null);
-      case Right(str): str;
+      case Right(ct):
+        var p = new haxe.macro.Printer();
+        p.printComplexType(ct);
     }) + this.suffix;
     if (optional_as_null && this.optional) result = 'Null<' + result + '>';
     return result;
   }
 
-  public function clone():TypeStringifier
+  public function clone():ComplexType
   {
-    var sheep = new TypeStringifier( switch this.child {
+    var sheep = new ComplexType( switch this.child {
       case Left(ts): ts.clone();
       case Right(str): str;
     });
@@ -690,7 +771,7 @@ private class TypeStringifier
     return sheep;
   }
 
-  public function follow():TypeStringifier
+  public function follow():ComplexType
   {
     return switch this.child {
       case Right(str): this; // no follow necessary/possible
@@ -709,7 +790,7 @@ private class TypeStringifier
     }
   }
 }
-typedef TSChildOrBareString = OneOf<TypeStringifier,String>;
+typedef TSChildOrComplexType = OneOf<ComplexType,ComplexType>;
 
 typedef FieldArguments = Array<{
   field:String,
