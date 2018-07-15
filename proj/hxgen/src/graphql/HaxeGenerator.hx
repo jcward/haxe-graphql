@@ -245,10 +245,11 @@ class HaxeGenerator
   {
     var on_type = def.typeCondition.name.value;
     var tname = 'Fragment_${ def.name.value }';
+    // If fragments can have fragments, this could
     generate_type_based_on_selection_set(tname,
                                          tname,
                                          def.selectionSet,
-                                         [ on_type ]);
+                                         on_type);
   }
 
   /**
@@ -382,24 +383,25 @@ class HaxeGenerator
   }
 
   function write_union_as_haxe_abstract(def:ASTDefs.UnionTypeDefinitionNode) {
-    // trace('Generating union (enum): '+def.name.value);
     var values = [];
-    define_type(TUnion(def.name.value, values));
-    //var union_types_note = def.types.map(function(t) return t.name.value).join(" | ");
-    //_stdout_writer.append('/* union '+def.name.value+' = ${ union_types_note } */');
-    //_stdout_writer.append('abstract '+def.name.value+'(Dynamic) {');
-    //for (type in def.types) {
-    //  if (type.name==null) throw 'Expecting Named Type';
-    //  var type_name = type.name.value;
-    //  type_referenced(def.name.value);
-    //  _stdout_writer.append(' @:from static function from${ type_name }(v:${ type_name }) return cast v;');
-    //}
-    //_stdout_writer.append('}');
-
     for (type in def.types) {
       if (type.name==null) throw 'Expecting Named Type';
       values.push(type.name.value);
     }
+
+    generate_union_of_types(values, def.name.value);
+  }
+
+  // values and return are all TPath Strings
+  function generate_union_of_types(values:Array<String>, tname:String=null):String
+  {
+    if (tname==null) {
+      values.sort(function(a,b) return a>b ? 1 : -1);
+      tname = 'U__'+values.join('_');
+      if (_defined_types.indexOf(tname)>=0) return tname;
+    }
+    define_type(TUnion(tname, values));
+    return tname;
   }
 
   // A schema definition is just a mapping / typedef alias to specific types
@@ -475,75 +477,70 @@ class HaxeGenerator
     */
   }
 
-  function parse_op_for_fragment_unions(root_schema:SchemaMap,
-                                        root:ASTDefs.DocumentNode,
-                                        op_name:String,
-                                        op_root_type:String,
-                                        def:ASTDefs.OperationDefinitionNode):Void
+  private var _inline_fragment_signatures = new Array<String>();
+  function get_fragment_tname(sel_node:Dynamic)
   {
-    // _stdout_writer.append('typedef OP_${ op_name }_Result = {');
-    // handle_selection_set(op_name, def.selectionSet, [ op_root_type ], true);
-    // _stdout_writer.append('}');
-  }
+    // It's either the name of a NamedFragment... or for inline,
+    // generate e.g. PersonFRAG1 (depending on which fields we pick
+    // from the concrete type)
+    if (sel_node.kind==Kind.FRAGMENT_SPREAD) {
+      return 'Fragment_'+sel_node.name.value;
+    }
 
-  function gen_fragment_union(op_name:String,
-                              sel_set:{ selections:Array<SelectionNode> },
-                              type_path:Array<String>)
-  {
-    trace(op_name);
-    trace(type_path);
-    trace(sel_set);
-    #if (js && debug) js.Lib.debug(); #end
+    var concrete = sel_node.typeCondition.name.value;
 
-    // _stdout_writer.append('/* union for operation $op_name fragments at ${ type_path.join(".") } */');
-    var union_name = 'QFrag_${ op_name }_${ type_path.join("_") }';
-    var ud:UnionTypeDefinitionNode = {
-        kind:Kind.UNION_TYPE_DEFINITION,
-        name:{ value:union_name, kind:Kind.NAME },
-        types:[]
-    };
-    var frags = sel_set.selections.filter(function(sel_node) return sel_node.kind.indexOf('Fragment')>=0);
+    function define_frag(key:String) {
+      var idx = _inline_fragment_signatures.length;
+      _inline_fragment_signatures.push(key);
+      var tname = 'InlineFrag${idx}_on_${concrete}';
+      generate_type_based_on_selection_set(tname,
+                                           tname,
+                                           sel_node.selectionSet,
+                                           concrete);
+      return idx;
+    }
 
-    throw 'ARG, pick up fragment work here...';
-
-    // It gets recursive, so we need to fix the issue of global _stdout_writer / side-effects :(
-
-    // ud.
-    // for (sel_node in sel_set) {
-    //   sel
-    // ud.types.push
-    // write_union_as_haxe_abstract(ud);
-
+    var is_simple = true;
+    var fields = [ for (subsel in ((sel_node.selectionSet.selections):Array<Dynamic>)) {
+      (subsel.kind!='Field') ? { is_simple = false; null; } : subsel.name.value;
+    }];
+    var idx = -1;
+    var prefix = 'InlineFragment|${concrete}|';
+    if (is_simple) {
+      fields.sort(function(a,b) return a>b ? 1 : -1);
+      var key = prefix+fields.join('|');
+      idx = _inline_fragment_signatures.indexOf(key);
+      if (idx<0) {
+        idx = define_frag(key);
+      }
+    } else {
+      idx = define_frag(null);
+    }
+    return 'InlineFrag${idx}_on_${concrete}';
   }
 
   function generate_type_based_on_selection_set(type_name:String,
                                                 op_name:String,
                                                 sel_set:{ selections:Array<SelectionNode> },
-                                                type_path:Array<String>, // always abs
+                                                base_type:String,
                                                 depth:Int=0):GQLTypeDefinition
   {
-    if (sel_set==null || sel_set.selections==null) {
-      // Nothing left to do...
-    }
-
-    // No output for is_gen_fragments
     var fields = new StringMapAA<GQLFieldType>();
 
-    // Store it now?
-    define_type(TStruct(type_name, fields));
+    // Determine possible types, based on fragments. If multiple types,
+    // then we generate a union.
+    var possible_types = [ base_type ];
+    for (sel_node in sel_set.selections) {
+      if ((cast sel_node).typeCondition!=null) {
+        var possible = get_fragment_tname(cast sel_node);
+        if (possible_types.indexOf(possible)<0) possible_types.push(possible);
+      }
+    }
 
-    // Only store in globally if it's a union...
-    // _op_type_definitions[type_name] = struct_type;
-
-    // If selection set has a fragment, it's result is a union type
-    //var has_fragment = sel_set.selections.find(function(sel_node) return sel_node.kind.indexOf('Fragment')>=0)!=null;
-    //if (has_fragment && is_gen_fragments) {
-    //  throw 'TODO: FragmentSpread InlineFragment';
-    //  gen_fragment_union(op_name, sel_set, type_path);
-    //}
+    var type_path = [ base_type ];
 
     for (sel_node in sel_set.selections) {
-      switch (sel_node.kind) { // FragmentSpead | Field | InlineFragment
+      switch (sel_node.kind) { // FragmentSpread | Field | InlineFragment
       case Kind.FIELD:
         var field_node:FieldNode = cast sel_node;
 
@@ -561,9 +558,11 @@ class HaxeGenerator
             fields[alias] = resolved;
           case TStruct(tname, tfields):
             if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
-            var sub_type_name = depth==0 ? StringTools.replace(type_name, '_Result', '_InnerResult') : type_name+'__'+name;
 
-            var sub_type = generate_type_based_on_selection_set(sub_type_name, op_name, field_node.selectionSet, [ tname ], depth+1);
+            var sub_type_name = (depth==0 && StringTools.endsWith(type_name, '_Result')) ?
+              StringTools.replace(type_name, '_Result', '_InnerResult') : type_name+'__'+name;
+
+            var sub_type = generate_type_based_on_selection_set(sub_type_name, op_name, field_node.selectionSet, tname, depth+1);
             var f = { type:null, is_array:resolved.is_array, is_optional:resolved.is_optional };
             fields[alias] = f;
             /*if (sub_type.has_union_field()) {
@@ -571,17 +570,29 @@ class HaxeGenerator
               f.type = TPath(sub_type_name);
             } else { // merge into my type
               _types_by_name.remove(sub_type_name);
+              _defined_types.remove(sub_type_name);
               f.type = TAnon(sub_type);
             }
           case TUnion(tname, _):
             if (field_node.selectionSet!=null) throw 'Hmm, do we allow specifying sub-fields of union ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
             fields[alias] = resolved;
         }
+        case Kind.INLINE_FRAGMENT:
+          // Handled above
+        case Kind.FRAGMENT_SPREAD:
+          // Handled above
+        default: throw 'Unhandled sel_node kind ${ sel_node.kind }';
       }
     }
 
+    if (possible_types.length>1) {
+      generate_union_of_types(possible_types, type_name);
+      return _types_by_name[type_name];
+    } else {
+      define_type(TStruct(type_name, fields));
+      return _types_by_name[type_name];
+    }
     
-    return _types_by_name[type_name];
   }
 
   function write_operation_def_result(root_schema:SchemaMap,
@@ -603,13 +614,11 @@ class HaxeGenerator
       throw 'Error processing ${ op_name }: Only query and mutation are supported.';
     }
 
-    parse_op_for_fragment_unions(root_schema, root, op_name, op_root_type, def);
-
     // gen type based on selection set
     generate_type_based_on_selection_set('OP_${ op_name }_Result',
                                          op_name,
                                          def.selectionSet,
-                                         [ op_root_type ]);
+                                         op_root_type);
 
     return { op_name:op_name, variables:def.variableDefinitions };
   }

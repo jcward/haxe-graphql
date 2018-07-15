@@ -58,20 +58,8 @@ query ByName($$name:String!) {
   by_name(name: $$name) {
     name
 
-    # Simple DRY fragment on expected type (note: field is double specified)
-    ...JustName
-
-    # Inline Fragment on a ceratin implementor of this interface
     ... on Person {
-      ...PersonDetails # named fragment on this expected type
- 
-      job {
-        title
-        ... on Plumber {
-          plumber_id
-          ...PlumberDetails
-        }
-      }
+      person_id
     }
  
     ... on Dog {
@@ -79,20 +67,6 @@ query ByName($$name:String!) {
     }
 
   }
-}
-
-
-fragment JustName on HasName {
-  name
-}
-
-fragment PersonDetails on Person {
-  person_id
-}
-
-fragment PlumberDetails on Plumber {
-  plumber_id
-  favorite_wrench
 }
 
 ';

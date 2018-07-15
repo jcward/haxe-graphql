@@ -36,6 +36,7 @@ interface Job {
 type Plumber implements Job {
   title:String!
   plumber_id:ID!
+  favorite_wrench: String!
 }
 
 type Person implements HasName {
@@ -57,8 +58,12 @@ query ByName($$name:String!) {
   by_name(name: $$name) {
     name
 
+    # Simple DRY fragment on expected type (note: field is double specified)
+    ...JustName
+
+    # Inline Fragment on a ceratin implementor of this interface
     ... on Person {
-      ...PersonDetails
+      ...PersonDetails # named fragment on this expected type
  
       job {
         title
@@ -77,13 +82,17 @@ query ByName($$name:String!) {
 }
 
 
-## TODO: Named fragment (DRY)
+fragment JustName on HasName {
+  name
+}
+
 fragment PersonDetails on Person {
   person_id
 }
 
 fragment PlumberDetails on Plumber {
   plumber_id
+  favorite_wrench
 }
 
 ';
