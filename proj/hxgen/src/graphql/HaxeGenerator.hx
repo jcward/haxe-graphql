@@ -6,7 +6,6 @@ import haxe.ds.Either;
 import haxe.macro.Expr;
 
 using Lambda;
-using graphql.HaxeGenerator.GQLTypeTools;
 
 @:enum abstract GenerateOption(String) {
   var TYPEDEFS = 'typedefs';
@@ -600,13 +599,11 @@ class HaxeGenerator
   function print_to_stdout():String {
     var stdout_writer = new StringWriter();
     stdout_writer.append('/* - - - - Haxe / GraphQL compatibility types - - - - */');
-    stdout_writer.append('abstract IDString(String) to String from String {\n  // Relaxed safety -- allow implicit fromString');
+    stdout_writer.append('abstract ID(String) to String from String {\n  // Relaxed safety -- allow implicit fromString');
     stdout_writer.append('  //  TODO: optional strict safety -- require explicit fromString:');
     stdout_writer.append('  //  public static inline function fromString(s:String) return cast s;');
     stdout_writer.append('  //  public static inline function ofString(s:String) return cast s;');
     stdout_writer.append('}');
-    stdout_writer.append('typedef Boolean = Bool; // Workaround for issue #24 - this blocks gql Bool');
-    stdout_writer.append('typedef ID = IDString;');
     stdout_writer.append('');
     
     // Print types
@@ -688,11 +685,17 @@ class GQLTypeTools
     return p.printComplexType(ct);
   }*/
 
+  public static function gql_to_haxe_type_name_transforms(tname:String):String
+  {
+    if (tname=="Boolean") return "Bool";
+    return tname;
+  }
+
   public static function to_haxe_field(field_name:String, gql_f:GQLFieldType):Field
   {
     switch gql_f.type {
       case TPath(name):
-        var ct:ComplexType = TPath({ pack:[], name:name });
+        var ct:ComplexType = TPath({ pack:[], name:gql_to_haxe_type_name_transforms(name) });
         if (gql_f.is_array) ct = TPath({ pack:[], name:'Array', params:[ TPType(ct) ] });
         var field = { name:field_name, kind:FVar(ct, null), meta:[], pos:FAKE_POS };
         if (gql_f.is_optional) field.meta.push({ name:":optional", pos:FAKE_POS });
