@@ -605,7 +605,10 @@ class HaxeGenerator
     stdout_writer.append('  //  public static inline function ofString(s:String) return cast s;');
     stdout_writer.append('}');
     stdout_writer.append('');
-    
+
+    // Check for collisions (Bool is the only problematic identifier?)
+    if (_types_by_name.exists('Bool')) GQLTypeTools.bool_collision = true;
+
     // Print types
     for (name in _types_by_name.keys()) {
       if (_basic_types.indexOf(name)>=0) continue;
@@ -685,8 +688,10 @@ class GQLTypeTools
     return p.printComplexType(ct);
   }*/
 
+  public static var bool_collision = false;
   public static function gql_to_haxe_type_name_transforms(tname:String):String
   {
+    if (tname=="Bool" && bool_collision) return "Bool_";
     if (tname=="Boolean") return "Bool";
     return tname;
   }
@@ -727,7 +732,7 @@ class GQLTypeTools
           values.map(function(v) return 'var $v = "$v";').join("\n  ")+'\n}';
       case TStruct(name, fields):
         var haxe_td:TypeDefinition = {
-          pack:[], name:name, pos:FAKE_POS, kind:TDStructure, fields:[]
+          pack:[], name:gql_to_haxe_type_name_transforms(name), pos:FAKE_POS, kind:TDStructure, fields:[]
         };
         for (field_name in fields.keys()) {
           haxe_td.fields.push( to_haxe_field(field_name, fields[field_name]) );

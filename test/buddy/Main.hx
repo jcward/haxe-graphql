@@ -4,6 +4,7 @@ using buddy.Should;
 class Main implements Buddy<[
                              // Basic functional and smoke tests
                              tests.basic.BasicTypes,
+                             tests.basic.BoolTest,
                              tests.basic.ValidHaxe,
                              tests.basic.Reporting,
                              tests.basic.BasicSchema,

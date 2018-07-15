@@ -23,32 +23,38 @@ class Test
 
     var source = '
 
-type Query {
-  by_title(title:String!): [FilmData]
+schema {
+  query: FooBarQuery
+}
+
+scalar Date
+
+type Director {
+  name: String!
+  age:Int!
 }
 
 type FilmData {
-  id: ID!
-  title: String
-  related_films: [ID]
-  tag_list: [String]!
+  title:ID!
+  director:Director
+  releaseDate:Date
 }
 
-query FilmsByTitle($$title: String!) {
-  by_title(title:$$title) {
-    id
+type FooBarQuery {
+  film: [FilmData]
+}
+
+query GetReturnOfTheJedi($$id: ID) {
+  film(id: $$id) {
     title
-    related_films
-    tag_list
+    director {
+      name
+      age
+    }
+    releaseDate
   }
 }
 
-enum A_OR_B {
-  A
-  B
-}
-
-union DaUnion = FilmData | Query
 ';
 
     // var td = 
