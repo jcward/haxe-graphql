@@ -23,50 +23,70 @@ class Test
 
     var source = '
 
-schema {
-  query: FooBarQuery
+interface HasName {
+  name:String!
 }
 
-scalar Date
+union Being = Person | Dog
 
-type Director {
-  name: String!
-  age:Int!
+interface Job {
+  title:String!
 }
 
-type FilmData {
-  title:ID!
-  director:Director
-  releaseDate:Date
+type Plumber implements Job {
+  title:String!
+  plumber_id:ID!
 }
 
-type FooBarQuery {
-  film: [FilmData]
+type Person implements HasName {
+  person_id:ID!
+  name:String!
+  job:Job
 }
 
-query GetReturnOfTheJedi($$id: ID) {
-  film(id: $$id) {
-    title
-    director {
-      name
-      age
+type Dog implements HasName {
+  dog_id:ID!
+  name:String!
+}
+
+type Query {
+  by_name(name:String!): HasName
+}
+
+query ByName($$name:String!) {
+  by_name(name: $$name) {
+    name
+
+    ... on Person {
+      ...PersonDetails
+ 
+      job {
+        title
+        ... on Plumber {
+          plumber_id
+          ...PlumberDetails
+        }
+      }
     }
-    releaseDate
+ 
+    ... on Dog {
+      dog_id
+    }
+
   }
 }
 
+
+## TODO: Named fragment (DRY)
+fragment PersonDetails on Person {
+  person_id
+}
+
+fragment PlumberDetails on Plumber {
+  plumber_id
+}
+
 ';
-
-    // var td = 
-    // var p = new haxe.macro.Printer();
-    // trace(p.printTypeDefinition(td));
-    trace(macro :Int);
-    trace(macro :String);
-    trace(macro :Array<String>);
-    trace(macro :Test);
-
-    var p = new haxe.macro.Printer();
-    trace(p.printComplexType( macro :Array<Array<{ a:String, ?b:Int }>> ));
 
     var p = new graphql.parser.Parser(source, { noLocation:true });
     trace(source);

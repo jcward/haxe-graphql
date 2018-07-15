@@ -147,7 +147,7 @@ class HaxeGenerator
       case ASTDefs.Kind.UNION_TYPE_DEFINITION:
         write_union_as_haxe_abstract(cast def);
       case ASTDefs.Kind.OPERATION_DEFINITION:
-        // No-op, still generating type map
+        // No-op, still generating type definitions
       case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
         // TODO: anything special about Interfaces ?
         var args = write_haxe_typedef(cast def);
@@ -156,13 +156,21 @@ class HaxeGenerator
         // TODO: anything special about InputObjectTypeDefinition ?
         var args = write_haxe_typedef(cast def);
         handle_args([get_def_name(cast def)], args);
+      case ASTDefs.Kind.FRAGMENT_DEFINITION:
+        // No-op, still generating type definitions
       default:
         var name = (cast def).name!=null ? (' - '+(cast def).name.value) : '';
         error('Error: unknown / unsupported definition kind: '+def.kind+name);
       }
     }
+    // Third pass: genearte fragment definitions
+    for (def in doc.definitions) switch def.kind {
+      case ASTDefs.Kind.FRAGMENT_DEFINITION:
+        write_fragment_as_haxe_typedef(cast def);
+      default:
+    }
 
-    // Third pass: write operation results
+    // Fourth pass: write operation results
     for (def in doc.definitions) switch def.kind {
       case ASTDefs.Kind.OPERATION_DEFINITION:
         var vars = write_operation_def_result(root_schema, doc, cast def);
@@ -231,6 +239,16 @@ class HaxeGenerator
     return field_type_0.is_array==field_type_1.is_array &&
            field_type_0.is_optional==field_type_1.is_optional &&
            field_type_0.type==field_type_1.type;
+  }
+
+  function write_fragment_as_haxe_typedef(def:ASTDefs.FragmentDefinitionNode)
+  {
+    var on_type = def.typeCondition.name.value;
+    var tname = 'Fragment_${ def.name.value }';
+    generate_type_based_on_selection_set(tname,
+                                         tname,
+                                         def.selectionSet,
+                                         [ on_type ]);
   }
 
   /**
