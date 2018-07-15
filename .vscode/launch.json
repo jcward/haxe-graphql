@@ -8,7 +8,7 @@
       "name": "Launch via NPM",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}/test/manual_debug",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "run-script", "debug"
