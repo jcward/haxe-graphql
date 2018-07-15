@@ -708,6 +708,7 @@ class GQLTypeTools
           fields.push(to_haxe_field(fname, inner));
         }
         var field = { name:field_name, kind:FVar(TAnonymous(fields), null), meta:[], pos:FAKE_POS };
+        if (gql_f.is_optional) field.meta.push({ name:":optional", pos:FAKE_POS });
         return field;
 
       case TAnon(any): throw 'Non-struct types are not supported in TAnon: ${ any }';
