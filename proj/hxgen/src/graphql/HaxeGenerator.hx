@@ -37,6 +37,7 @@ class HaxeGenerator
   private var _defined_types = [];
   private var _referenced_types = [];
   private var _types_by_name = new StringMapAA<GQLTypeDefinition>();
+  private var _interfaces_implemented = new StringMapAA<Array<String>>();
 
   public static function parse(doc:DocumentNode,
                                ?options:HxGenOptions,
@@ -265,6 +266,14 @@ class HaxeGenerator
 
     var interface_fields_from = new StringMapAA<String>();
     var skip_interface_fields = new StringMapAA<ComplexType>();
+
+    _interfaces_implemented[def.name.value] = [];
+    if (def.interfaces!=null) {
+      for (intf in def.interfaces) {
+        var ifname = intf.name.value;
+        _interfaces_implemented[def.name.value].push(ifname);
+      }
+    }
 
 //    if (def.interfaces!=null) {
 //      for (intf in def.interfaces) {

@@ -23,76 +23,68 @@ class Test
 
     var source = '
 
+interface Character {
+  character_id:ID!
+  name:String!
+  age:Int!
+}
+
+type Droid implements Character & HasName {
+  character_id:ID!
+  droid_id:ID!
+  name:String!
+  age:Int!
+  bot_type:String!
+}
+
+type Human implements Character & HasName {
+  character_id:ID!
+  human_id:ID!
+  name:String!
+  age:Int!
+  hair_color:String
+  vision_20:Int
+}
+
 interface HasName {
   name:String!
 }
 
-union Being = Person | Dog
-
-interface Job {
-  title:String!
-}
-
-type Plumber implements Job {
-  title:String!
-  plumber_id:ID!
-  favorite_wrench: String!
-}
-
-type Person implements HasName {
-  person_id:ID!
-  name:String!
-  job:Job
-}
-
-type Dog implements HasName {
-  dog_id:ID!
-  name:String!
-}
-
 type Query {
-  by_name(name:String!): HasName
+  character_by_name(name:String!): HasName
+  character_by_id(id:ID!): Character
 }
 
-query ByName($$name:String!) {
-  by_name(name: $$name) {
+query CharacterByName($$name:String!) {
+  character_by_name(name: $$name) {
     name
-
-    # Simple DRY fragment on expected type (note: field is double specified)
-    ...JustName
-
-    # Inline Fragment on a ceratin implementor of this interface
-    ... on Person {
-      ...PersonDetails # named fragment on this expected type
- 
-      job {
-        title
-        ... on Plumber {
-          plumber_id
-          ...PlumberDetails
-        }
-      }
-    }
- 
-    ... on Dog {
-      dog_id
-    }
-
+    ... on Human { ...HumanDetails }
+    ... on Droid { ...DroidDetails }
   }
 }
 
-
-fragment JustName on HasName {
-  name
+query CharacterByID($$id:ID!) {
+  character_by_id(id: $$id) {
+    character_id
+    name
+    age
+    ... on Human { ...HumanDetails }
+    ... on Droid { ...DroidDetails }
+  }
 }
 
-fragment PersonDetails on Person {
-  person_id
+fragment HumanDetails on Human {
+  human_id
+  age
+  hair_color
+  vision_20
 }
 
-fragment PlumberDetails on Plumber {
-  plumber_id
-  favorite_wrench
+fragment DroidDetails on Droid {
+  character_id
+  droid_id
+  age
+  bot_type
 }
 
 ';
