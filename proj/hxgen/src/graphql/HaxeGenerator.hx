@@ -31,13 +31,14 @@ typedef SomeNamedNode = { kind:String, name:NameNode };
 class HaxeGenerator
 {
   private var _stderr_writer:StringWriter;
-  private var _interfaces = new StringMapAA<InterfaceType>();
   private var _options:HxGenOptions;
+
+  // private var _interfaces = new StringMapAA<InterfaceType>();
 
   private var _fragment_defs = new Array<ASTDefs.FragmentDefinitionNode>();
   private var _defined_types = [];
   private var _list_of_interfaces = [];
-  private var _list_of_unions = new StringMapAA<Array<String>>();
+  private var _map_of_union_types = new StringMapAA<Array<String>>();
   private var _referenced_types = [];
   private var _types_by_name = new StringMapAA<GQLTypeDefinition>();
   private var _interfaces_implemented = new StringMapAA<Array<String>>();
@@ -89,7 +90,7 @@ class HaxeGenerator
         name:{ value:args_name, kind:Kind.NAME },
         fields:cast a.arguments
       };
-      write_haxe_typedef(args_obj);
+      ingest_tstruct_like_type(args_obj);
     }
   }
 
@@ -108,7 +109,7 @@ class HaxeGenerator
       name:{ value:'OP_${ opv.op_name }_Vars', kind:Kind.NAME },
       fields:fields
     };
-    write_haxe_typedef(vars_obj);
+    ingest_tstruct_like_type(vars_obj);
   }
 
   // Parse a graphQL AST document, generating Haxe code
@@ -132,7 +133,7 @@ class HaxeGenerator
         //   handle_args([get_def_name(cast def)], args);
         case ASTDefs.Kind.SCHEMA_DEFINITION:
           if (root_schema!=null) error('Error: cannot specify two schema definitions');
-          root_schema = write_schema_def(cast def);
+          root_schema = ingest_schema_def(cast def);
         case _:
       }
     }
@@ -143,24 +144,24 @@ class HaxeGenerator
       case ASTDefs.Kind.SCHEMA_DEFINITION:
         // null op, handled above
       case ASTDefs.Kind.SCALAR_TYPE_DEFINITION:
-        write_haxe_scalar(cast def);
+        ingest_scalar_type_def(cast def);
       case ASTDefs.Kind.ENUM_TYPE_DEFINITION:
-        write_haxe_abstract_enum(cast def);
+        ingest_enum_type_def(cast def);
       case ASTDefs.Kind.OBJECT_TYPE_DEFINITION:
-        var args = write_haxe_typedef(cast def);
+        var args = ingest_tstruct_like_type(cast def);
         handle_args([get_def_name(cast def)], args);
       case ASTDefs.Kind.UNION_TYPE_DEFINITION:
-        write_union_as_haxe_abstract(cast def);
+        ingest_union_type_def(cast def);
       case ASTDefs.Kind.OPERATION_DEFINITION:
         // No-op, still generating type definitions
       case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
         // TODO: anything special about Interfaces ?
         _list_of_interfaces.push((cast def).name.value);
-        var args = write_haxe_typedef(cast def);
+        var args = ingest_tstruct_like_type(cast def);
         handle_args([get_def_name(cast def)], args);
       case ASTDefs.Kind.INPUT_OBJECT_TYPE_DEFINITION:
         // TODO: anything special about InputObjectTypeDefinition ?
-        var args = write_haxe_typedef(cast def);
+        var args = ingest_tstruct_like_type(cast def);
         handle_args([get_def_name(cast def)], args);
       case ASTDefs.Kind.FRAGMENT_DEFINITION:
         // No-op, still generating type definitions
@@ -263,20 +264,19 @@ class HaxeGenerator
   }
 
   /**
-   * @param {GraphQL.ObjectTypeDefinitionNode} def
+   * various node types passed in here... object types, interfaces, query args, etc
    */
-  function write_haxe_typedef(def:ASTDefs.ObjectTypeDefinitionNode):FieldArguments
+  function ingest_tstruct_like_type(def:{ name:graphql.NameNode,
+                                          kind:String,
+                                          fields:Array<graphql.FieldDefinitionNode>,
+                                          ?interfaces:Array<graphql.NamedTypeNode> }):FieldArguments
   {
     var args:FieldArguments = [];
 
-    // TODO: cli args for:
-    //  - long vs short typedef format
-    var short_format = true;
+    // var interface_fields_from = new StringMapAA<String>();
+    // var skip_interface_fields = new StringMapAA<ComplexType>();
 
-    var interface_fields_from = new StringMapAA<String>();
-    var skip_interface_fields = new StringMapAA<ComplexType>();
-
-    // Object types may optionall implement interfaces
+    // Per GraphQL spoec: only Object types may implement interfaces
     if (def.kind==ASTDefs.Kind.OBJECT_TYPE_DEFINITION) {
       _interfaces_implemented[def.name.value] = [];
       if (def.interfaces!=null) {
@@ -369,23 +369,12 @@ class HaxeGenerator
 //    _interfaces[name] = intf;
 //
 //    // Generate the interface like a type
-//    write_haxe_typedef(def);
+//    ingest_tstruct_like_type(def);
 //
 //    return args;
 //  }
 
-  // TODO: optional?
-  // function write_haxe_enum(def:ASTDefs.EnumTypeDefinitionNode) {
-  //   // trace('Generating enum: '+def.name.value);
-  //   define_type(def.name.value);
-  //   _stdout_writer.append('enum '+def.name.value+' {');
-  //   for (enum_value in def.values) {
-  //     _stdout_writer.append('  '+enum_value.name.value+';');
-  //   }
-  //   _stdout_writer.append('}');
-  // }
-
-  function write_haxe_abstract_enum(def:ASTDefs.EnumTypeDefinitionNode) {
+  function ingest_enum_type_def(def:ASTDefs.EnumTypeDefinitionNode) {
     // trace('Generating enum: '+def.name.value);
     var values = [];
     define_type(TEnum(def.name.value, values));
@@ -394,20 +383,20 @@ class HaxeGenerator
     }
   }
 
-  function write_haxe_scalar(def:ASTDefs.ScalarTypeDefinitionNode) {
+  function ingest_scalar_type_def(def:ASTDefs.ScalarTypeDefinitionNode) {
     // trace('Generating scalar: '+def.name.value);
     define_type(TScalar(def.name.value));
     //_stdout_writer.append('/* scalar ${ def.name.value } */\nabstract ${ def.name.value }(Dynamic) { }');
   }
 
-  function write_union_as_haxe_abstract(def:ASTDefs.UnionTypeDefinitionNode) {
+  function ingest_union_type_def(def:ASTDefs.UnionTypeDefinitionNode) {
     var values = [];
     for (type in def.types) {
       if (type.name==null) throw 'Expecting Named Type';
       values.push(type.name.value);
     }
 
-    _list_of_unions[def.name.value] = values;
+    _map_of_union_types[def.name.value] = values;
 
     generate_union_of_types(values, def.name.value);
   }
@@ -425,7 +414,7 @@ class HaxeGenerator
   }
 
   // A schema definition is just a mapping / typedef alias to specific types
-  function write_schema_def(def:ASTDefs.SchemaDefinitionNode):SchemaMap {
+  function ingest_schema_def(def:ASTDefs.SchemaDefinitionNode):SchemaMap {
     var rtn = { query_type:null, mutation_type:null };
 
     //_stdout_writer.append('/* Schema: */');
@@ -479,64 +468,6 @@ class HaxeGenerator
     }
 
     throw '${ err_prefix }couldn\'t resolve path: ${ orig_path }';
-
-    // trace('Looking for ${ orig_path }, last_field was ${ last_field }');
-    // return last_field;
-    /*
-    var is_list = last_field.is_array();
-    var is_opt = last_field.is_optional();
-    var type_string:String = is_list ? array_inner_type(last_field) : last_field.toString();
-
-    var resolved = _types_by_name[type_string];
-    if (resolved==null) throw '${ err_prefix }Resolved ${ orig_path } to unknown type ${ type_string }';
-    if (resolved.fields==null) {
-      return LEAF(type_string, is_opt, is_list);
-    } else {
-      return TYPE(type_string, is_opt, is_list);
-    }
-    */
-  }
-
-  private var _inline_fragment_signatures = new Array<String>();
-  function get_fragment_tname(sel_node:Dynamic)
-  {
-    // It's either the name of a NamedFragment... or for inline,
-    // generate e.g. PersonFRAG1 (depending on which fields we pick
-    // from the concrete type)
-    if (sel_node.kind==Kind.FRAGMENT_SPREAD) {
-      return 'Fragment_'+sel_node.name.value;
-    }
-
-    var concrete = sel_node.typeCondition.name.value;
-
-    function define_frag(key:String) {
-      var idx = _inline_fragment_signatures.length;
-      _inline_fragment_signatures.push(key);
-      var tname = 'InlineFrag${idx}_on_${concrete}';
-      generate_type_based_on_selection_set(tname,
-                                           tname,
-                                           sel_node.selectionSet,
-                                           concrete);
-      return idx;
-    }
-
-    var is_simple = true;
-    var fields = [ for (subsel in ((sel_node.selectionSet.selections):Array<Dynamic>)) {
-      (subsel.kind!='Field') ? { is_simple = false; null; } : subsel.name.value;
-    }];
-    var idx = -1;
-    var prefix = 'InlineFragment|${concrete}|';
-    if (is_simple) {
-      fields.sort(function(a,b) return a>b ? 1 : -1);
-      var key = prefix+fields.join('|');
-      idx = _inline_fragment_signatures.indexOf(key);
-      if (idx<0) {
-        idx = define_frag(key);
-      }
-    } else {
-      idx = define_frag(null);
-    }
-    return 'InlineFrag${idx}_on_${concrete}';
   }
 
   function get_fragment_info(sel_node:SelectionNode)
@@ -562,14 +493,6 @@ class HaxeGenerator
     throw 'Error determining fragment info for fragment node: ${ sel_node }';
   }
 
-  function inject_fragment_node(type_restrictions:Array<String>,
-                                concrete_types_and_interfaces:StringMapAA<Array<SelectionNode>>,
-                                sel_node:SelectionNode)
-  {
-    // If the type restrictions are invalid, error out
-    // If the type restrictions are valid, inject fields into concrete_type(s)
-  }
-
   // Fragments / unification:
   //
   // Notes / quotes from spec:
@@ -589,7 +512,7 @@ class HaxeGenerator
   //  4) "The target type of fragment must have kind UNION, INTERFACE, or OBJECT."
   //
 
-  function is_union(t:String) return _list_of_unions.exists(t);
+  function is_union(t:String) return _map_of_union_types.exists(t);
   function is_interface(t:String) return _list_of_interfaces.indexOf(t)>=0;
   function is_object_type(t:String) return switch (_types_by_name[t]) {
     case TStruct(_): !is_interface(t);
@@ -605,7 +528,7 @@ class HaxeGenerator
   // Not recursive because unions must only consist of Object types
   function is_member_of_union(t:String, u:String) {
     if (!is_union(u)) return false;
-    for (member in _list_of_unions[u]) if (member==t) return true;
+    for (member in _map_of_union_types[u]) if (member==t) return true;
     return false;
   }
 
@@ -623,7 +546,7 @@ class HaxeGenerator
 
     // If constraint_type is a union, obj_type must be a member:
     if (is_union(constraint_type)) {
-      return _list_of_unions[constraint_type].indexOf(obj_type)>=0;
+      return _map_of_union_types[constraint_type].indexOf(obj_type)>=0;
     }
 
     return false;
@@ -664,7 +587,7 @@ class HaxeGenerator
 
     if (is_union(base_type)) { // return all member object types of union base_type
       var rtn = [];
-      for (member in _list_of_unions[base_type]) {
+      for (member in _map_of_union_types[base_type]) {
         if (!is_object_type(member)) 'Union ${ base_type } may not contain any type (${ member }) other than object types, per GraphQL spec';
         rtn.push(member);
       }
@@ -684,8 +607,6 @@ class HaxeGenerator
                                                 depth:Int=0):GQLTypeDefinition
   {
     if (_basic_types.indexOf(base_type)>=0) throw 'Cannot create a fragment or operation ${ op_name } on a basic type, ${ base_type }';
-
-    // var fields = new StringMapAA<GQLFieldType>();
 
     var possible_object_types = get_possible_object_types_from(base_type);
 
@@ -738,7 +659,7 @@ class HaxeGenerator
       var ignore_duplicates = [];
 
       for (sel_node in field_nodes_per_object_type[obj_type]) {
-        switch (sel_node.kind) { // FragmentSpread | Field | InlineFragment
+        switch (sel_node.kind) { // Field | FragmentSpread | InlineFragment
         case Kind.FIELD:
           var field_node:FieldNode = cast sel_node;
   
@@ -749,7 +670,6 @@ class HaxeGenerator
           var dup_key = '$name -> $alias';
           if (ignore_duplicates.indexOf(dup_key)>=0) continue;
           ignore_duplicates.push(dup_key);
-
 
           var next_type_path = type_path.slice(0);
           next_type_path.push(name);
@@ -805,8 +725,6 @@ class HaxeGenerator
 
     var op_name = def.name.value;
 
-    //_stdout_writer.append('/* Operation def: ${ op_name } */');
-
     var op_root_type = '';
     if (def.operation=='query') {
       op_root_type = (root_schema==null || root_schema.query_type==null) ? 'Query' : root_schema.query_type;
@@ -827,12 +745,12 @@ class HaxeGenerator
 
   function print_to_stdout():String {
     var stdout_writer = new StringWriter();
-    stdout_writer.append('/* - - - - Haxe / GraphQL compatibility types - - - - */');
-    stdout_writer.append('abstract ID(String) to String from String {\n  // Relaxed safety -- allow implicit fromString');
-    stdout_writer.append('  //  TODO: optional strict safety -- require explicit fromString:');
-    stdout_writer.append('  //  public static inline function fromString(s:String) return cast s;');
-    stdout_writer.append('  //  public static inline function ofString(s:String) return cast s;');
-    stdout_writer.append('}');
+    stdout_writer.append('/* - - - - Haxe / GraphQL compatibility types - - - - */
+abstract ID(String) to String from String {\n  // Relaxed safety -- allow implicit fromString
+  //  TODO: optional strict safety -- require explicit fromString:
+  //  public static inline function fromString(s:String) return cast s;
+  //  public static inline function ofString(s:String) return cast s;
+}');
     stdout_writer.append('');
 
     // Check for collisions (Bool is the only problematic identifier?)
@@ -858,8 +776,8 @@ class HaxeGenerator
     // ID
     for (t in _basic_types) define_type(TBasic(t));
   }
-
 }
+
 
 class StringWriter
 {
@@ -880,20 +798,20 @@ class StringWriter
   public function toString():String return _output.join("\n");
 }
 
+
 // These will map to ComplexTypes:
 //  String        --> TPath(name)                    if not array, not optional
 //  Array<String> --> TPath('Array', [TPath(name)])  if array
 //  optional adds metadata to field
 enum GQLTypeRef {
   TPath(name:String);
-  TAnon(type:GQLTypeDefinition);
+  TAnon(type:GQLTypeDefinition); // Nested structures, only in selections (query / mutation / fragment)
 }
 typedef GQLFieldType = {
   type:GQLTypeRef, // aka, like a TPath(TypePath), or anon definition
   is_array:Bool,
   is_optional:Bool
 }
-
 enum GQLTypeDefinition {
   TBasic(name:String);
   TScalar(name:String);
@@ -902,21 +820,8 @@ enum GQLTypeDefinition {
   TStruct(name:String, fields:StringMapAA<GQLFieldType>);
 }
 
-// Will map to Haxe TypeDefinition (fields of FVar(t:ComplexType as above))
-// typedef GQLTypeDefinition = { name:String, type:GQLTypeIdentifier }
-
-// Will map to TAnonymous with nested structure definitions
-// typedef GQLStructTypeDef = { name:String, ?fields:StringMapAA<OneOf< GQLFieldType, GQLStructTypeDef>> }
-
 class GQLTypeTools
 {
-  /*public static function toString(ct:ComplexType, opt_as_meta:Bool):String
-  {
-    var p = new haxe.macro.Printer();
-    // TODO: opt_as_meta
-    return p.printComplexType(ct);
-  }*/
-
   public static var bool_collision = false;
   public static function gql_to_haxe_type_name_transforms(tname:String):String
   {
@@ -946,7 +851,6 @@ class GQLTypeTools
         return field;
 
       case TAnon(any): throw 'Non-struct types are not supported in TAnon: ${ any }';
-      //default: throw 'Basic types are not supported in TAnon';
     }
   }
 
@@ -1002,19 +906,6 @@ typedef ConstrainedFieldType = { constraints:Array<String>, field_node:Selection
 // - - - -
 
 
-// By @jbaudi and @fponticelli, https://gist.github.com/mrcdk/d881f85d64379e4384b1
-abstract OneOf<A, B>(Either<A, B>) from Either<A, B> to Either<A, B> {
-  @:from inline static function fromA<A, B>(a:A) : OneOf<A, B> return Left(a);
-  @:from inline static function fromB<A, B>(b:B) : OneOf<A, B> return Right(b);
-
-  @:to inline function toA():Null<A> return switch(this) {case Left(a): a; default: null;}
-  @:to inline function toB():Null<B> return switch(this) {case Right(b): b; default: null;}
-
-  // auto OneOf<A,B> <--> OneOf<B,A>
-  @:to inline function swap():OneOf<B, A> return switch this {case Right(b): Left(b); case Left(a): Right(a);}
-}
-
-
 // StringMap with Array Access
 @:forward
 abstract StringMapAA<T>(haxe.ds.StringMap<T>) from haxe.ds.StringMap<T> to haxe.ds.StringMap<T> {
@@ -1029,142 +920,3 @@ abstract StringMapAA<T>(haxe.ds.StringMap<T>) from haxe.ds.StringMap<T> to haxe.
     return v;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//
-//
-//  // Determine to which concrete types the selection nodes (fields and fragments)
-//  // will go into. The result will be a map of concrete types to field nodes,
-//  // with no fragment nodes and no union concrete types.
-//  function __resolve_fragment_nodes(debug_err_prefix:String,
-//                                  type:String,
-//                                  selections:Array<SelectionNode>,
-//                                  ancestor_types:Array<String>=null)
-//  {
-//    if (ancestor_types==null) ancestor_types = [];
-//    var type_is_interface = _list_of_interfaces.indexOf(type)>=0;
-//    var type_is_union = _list_of_unions.exists(type);
-//
-//    var concrete_types_and_interfaces = new StringMapAA<Array<SelectionNode>>();
-//
-//    var type_is_structure = switch _types_by_name[type] {
-//      // types and interfaces, not unions, scalars, or basics
-//      case TStruct(_):
-//        concrete_types_and_interfaces[type] = [];
-//        true;
-//      default:
-//        false;
-//    }
-//
-//    // Process:
-//    //
-//    // Step 1) for all selection nodes
-//    //  - if Field, ensure is_structure (TODO: or union of all structures that supply field)
-//    //    and place fields into cti[type]
-//    //  - if Fragment:
-//    //    - if on unifies to type, recursive resolve on concrete_type, and
-//    //      merge resulting cti into my cti (merge errors? aliases? etc?)
-//    //    - if not unifies, warn unreachable? ignore selections
-//
-//    for (sel_node in selections) {
-//      if (sel_node.kind==Kind.FIELD) {
-//        var field = cast sel_node;
-//        if (!type_is_structure) {
-//          var suffix = type_is_union ? ' (TODO: support union, where all members supply this field?)' : '';
-//          throw '${ debug_err_prefix }Cannot query fields ${ field.name.value } to non-struct ${ type }${ suffix }';
-//        }
-//        concrete_types_and_interfaces[type].push(field);
-//      } else if (sel_node.kind==Kind.FRAGMENT_SPREAD || sel_node.kind==Kind.INLINE_FRAGMENT) {
-//        var concrete = get_concrete_type_name(sel_node);
-//        if (valid_subtype_of(concrete, type)) {
-//          for (at in ancestor_types) {
-//            if (!valid_subtype_of(concrete, at)) throw '${ debug_err_prefix }Fragment unification of ${ concrete } to ${ at } failed while parsing fragment ${ sel_node }';
-//          }
-//          var next_ancestor_types = ancestor_types.slice(0);
-//          next_ancestor_types.push(concrete);
-//          merge_cti(resolve_fragment_nodes(debug_err_prefix, concrete, sel_node, next_ancestor_types);
-//        } else {
-//        }
-//      } else {
-//        throw '${ debug_err_prefix }Unhandled selection node kind: ${ sel_node.kind }';
-//      }
-//    }
-//
-//    // Step 2)
-//    //    - for all cti interface types, inject them into any other non-interface
-//    //      types that implement them.
-//    //    - if the base type itself implemented the interface, remove it from the
-//    //      cti. And warn -- unnecessary fragment applies to base type.
-//
-//
-//    // fields go into currently targeted type
-//    // concrete types:
-//    //  - must [ be base_type || be implemented by base_type(interface) ]
-//    //  - that match an existing type will get subsumed
-//    //  - otherwise, create a new concrete entry
-//    // concrete interfaces:
-//    //  - must be implemented by the current 'base_type'
-//    //  - will get subsumed into *every concrete type that implements it
-//    //  - iff base type doesn't implement, will create their own entry
-//
-//    // *The above rules require that we operate on types first, then interfaces.
-//
-//    function consider_interface_fragment(interface_name, node)
-//    {
-//      var base_implements:Bool = _interfaces_implemented[base_type].indexOf(interface_name)>=0;
-//
-//      // Inject into any type that implements this interface
-//      for (concrete in concrete_types_and_interfaces.keys()) {
-//        if (_interfaces_implemented[concrete].indexOf(interface_name)>=0) {
-//          inject_fragment(concrete_types_and_interfaces[concrete], node)
-//        }
-//      }
-//
-//      // If base doesn't implement, interface creates its own entry
-//      if (!base_implements) {
-//        concrete_types_and_interfaces[interface_name] = [];
-//        inject_fragment(concrete_types_and_interfaces[interface_name], node)
-//      }
-//    }
-//
-//    for (step in [1,2,3]) {
-//      for (sel_node in base_selections) {
-//        // Step 1: fields go directly into the base type set
-//        if (step==1 && sel_node.kind==Kind.FIELD) {
-//          concrete_types_and_interfaces[base_type].push(sel_node);
-//        }
-//        // Step 2: consider only fragments on concrete types
-//        if (step==2 && sel_node.kind!=Kind.FIELD) {
-//          var concrete = get_concrete_type_name(sel_node);
-//          if (_list_of_interfaces.indexOf(concrete)<0) {
-//            // Inject type fragment:
-//            inject_fragment(base_type, concrete_types_and_interfaces, sel_node)
-//          }
-//        }
-//        // Step 3: consider only fragments on concrete interfaces
-//        if (step==3 && sel_node.kind!=Kind.FIELD) {
-//          var concrete = get_concrete_type_name(sel_node);
-//          if (_list_of_interfaces.indexOf(concrete)>=0) {
-//            consider_interface_fragment(concrete, sel_node);
-//          }
-//        }
-//      }
-//    }
-//  }
