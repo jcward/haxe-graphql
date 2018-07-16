@@ -34,10 +34,14 @@ class HaxeGenerator
   private var _interfaces = new StringMapAA<InterfaceType>();
   private var _options:HxGenOptions;
 
+  private var _fragment_defs = new Array<ASTDefs.FragmentDefinitionNode>();
   private var _defined_types = [];
+  private var _list_of_interfaces = [];
+  private var _list_of_unions = new StringMapAA<Array<String>>();
   private var _referenced_types = [];
   private var _types_by_name = new StringMapAA<GQLTypeDefinition>();
   private var _interfaces_implemented = new StringMapAA<Array<String>>();
+  private var _named_fragment_concretes = new StringMapAA<String>();
 
   public static function parse(doc:DocumentNode,
                                ?options:HxGenOptions,
@@ -151,6 +155,7 @@ class HaxeGenerator
         // No-op, still generating type definitions
       case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
         // TODO: anything special about Interfaces ?
+        _list_of_interfaces.push((cast def).name.value);
         var args = write_haxe_typedef(cast def);
         handle_args([get_def_name(cast def)], args);
       case ASTDefs.Kind.INPUT_OBJECT_TYPE_DEFINITION:
@@ -159,11 +164,13 @@ class HaxeGenerator
         handle_args([get_def_name(cast def)], args);
       case ASTDefs.Kind.FRAGMENT_DEFINITION:
         // No-op, still generating type definitions
+        _fragment_defs.push(cast def);
       default:
         var name = (cast def).name!=null ? (' - '+(cast def).name.value) : '';
         error('Error: unknown / unsupported definition kind: '+def.kind+name);
       }
     }
+
     // Third pass: genearte fragment definitions
     for (def in doc.definitions) switch def.kind {
       case ASTDefs.Kind.FRAGMENT_DEFINITION:
@@ -246,7 +253,9 @@ class HaxeGenerator
   {
     var on_type = def.typeCondition.name.value;
     var tname = 'Fragment_${ def.name.value }';
-    // If fragments can have fragments, this could
+    _named_fragment_concretes[tname] = on_type;
+
+    // Fragments can have fragments... Do the order of these calls need to be determinant?
     generate_type_based_on_selection_set(tname,
                                          tname,
                                          def.selectionSet,
@@ -267,34 +276,33 @@ class HaxeGenerator
     var interface_fields_from = new StringMapAA<String>();
     var skip_interface_fields = new StringMapAA<ComplexType>();
 
-    _interfaces_implemented[def.name.value] = [];
-    if (def.interfaces!=null) {
-      for (intf in def.interfaces) {
-        var ifname = intf.name.value;
-        _interfaces_implemented[def.name.value].push(ifname);
+    // Object types may optionall implement interfaces
+    if (def.kind==ASTDefs.Kind.OBJECT_TYPE_DEFINITION) {
+      _interfaces_implemented[def.name.value] = [];
+      if (def.interfaces!=null) {
+        for (intf in def.interfaces) {
+          var ifname = intf.name.value;
+          _interfaces_implemented[def.name.value].push(ifname);
+
+          // TODO: bring back interface validation:
+          // if (!_interfaces.exists(ifname)) throw 'Requested interface '+ifname+' (implemented by '+def.name.value+') not found';
+          // var int_def = _interfaces[ifname];
+
+          // for (field_name in int_def.keys()) {
+          //   if (!skip_interface_fields.exists(field_name)) {
+          //     skip_interface_fields[field_name] = int_def.get(field_name);
+          //     interface_fields_from[field_name] = ifname;
+          //   } else {
+          //     // Two interfaces could imply the same field name... in which
+          //     // case we need to ensure the "more specific" definition is kept.
+          //     if (!field_types_equivalent(int_def.get(field_name), skip_interface_fields[field_name])) {
+          //       throw 'Type '+def.name.value+' inherits field '+field_name+' from multiple interfaces ('+ifname+', '+interface_fields_from[field_name]+'), the types of which do not match.';
+          //     }
+          //   }
+          // }
+        }
       }
     }
-
-//    if (def.interfaces!=null) {
-//      for (intf in def.interfaces) {
-//        var ifname = intf.name.value;
-//        if (!_interfaces.exists(ifname)) throw 'Requested interface '+ifname+' (implemented by '+def.name.value+') not found';
-//        var intf = _interfaces[ifname];
-//        _stdout_writer.append('  /* implements interface */ > '+ifname+',');
-//        for (field_name in intf.keys()) {
-//          if (!skip_interface_fields.exists(field_name)) {
-//            skip_interface_fields[field_name] = intf.get(field_name);
-//            interface_fields_from[field_name] = ifname;
-//          } else {
-//            // Two interfaces could imply the same field name... in which
-//            // case we need to ensure the "more specific" definition is kept.
-//            if (!field_types_equivalent(intf.get(field_name), skip_interface_fields[field_name])) {
-//              throw 'Type '+def.name.value+' inherits field '+field_name+' from multiple interfaces ('+ifname+', '+interface_fields_from[field_name]+'), the types of which do not match.';
-//            }
-//          }
-//        }
-//      }
-//    }
 
     var fields = new StringMapAA<GQLFieldType>();
     define_type(TStruct(def.name.value, fields));
@@ -308,6 +316,7 @@ class HaxeGenerator
       if (field.arguments!=null && field.arguments.length>0) {
         args.push({ field:field_name, arguments:field.arguments });
       }
+
 /*
       if (skip_interface_fields.exists(field_name)) {
         // Field is inherited from an interface, ensure the types match
@@ -397,6 +406,8 @@ class HaxeGenerator
       if (type.name==null) throw 'Expecting Named Type';
       values.push(type.name.value);
     }
+
+    _list_of_unions[def.name.value] = values;
 
     generate_union_of_types(values, def.name.value);
   }
@@ -528,77 +539,259 @@ class HaxeGenerator
     return 'InlineFrag${idx}_on_${concrete}';
   }
 
+  function get_fragment_info(sel_node:SelectionNode)
+  {
+    var info = null;
+    if (sel_node.kind==Kind.FRAGMENT_SPREAD) {
+      var name:String = 'Fragment_'+(cast sel_node).name.value;
+      var concrete = _named_fragment_concretes[name];
+      if (concrete==null) throw 'Error, did not find fragment spread named: ${ name }';
+      info = {
+        concrete:concrete,
+        selectionSet:_fragment_defs.find(function(def) {
+          return def.name.value==(cast sel_node).name.value;
+        }).selectionSet
+      }
+      return info;
+    }
+    if (sel_node.kind==Kind.INLINE_FRAGMENT) {
+      info = { concrete:(cast sel_node).typeCondition.name.value, selectionSet:(cast sel_node).selectionSet }
+      return info;
+    }
+
+    throw 'Error determining fragment info for fragment node: ${ sel_node }';
+  }
+
+  function inject_fragment_node(type_restrictions:Array<String>,
+                                concrete_types_and_interfaces:StringMapAA<Array<SelectionNode>>,
+                                sel_node:SelectionNode)
+  {
+    // If the type restrictions are invalid, error out
+    // If the type restrictions are valid, inject fields into concrete_type(s)
+  }
+
+  // Fragments / unification:
+  //
+  // Notes / quotes from spec:
+  //
+  //  1) unions do not contain interfaces or scalar, only object(struct) types:
+  //       https://github.com/graphql/graphql-js/issues/451
+  //       http://facebook.github.io/graphql/June2018/#sec-Unions
+  //     "The member types of a Union type must all be Object base types; Scalar,
+  //     Interface and Union types must not be member types of a Union."
+  //
+  //  2) interfaces can not implement other interfaces:
+  //       https://github.com/graphql/graphql-js/issues/778 (not yet)
+  //       http://facebook.github.io/graphql/June2018/#sec-Interfaces
+  //
+  //  3) "Fragments can reference each other, but cycles are not allowed"
+  //
+  //  4) "The target type of fragment must have kind UNION, INTERFACE, or OBJECT."
+  //
+
+  function is_union(t:String) return _list_of_unions.exists(t);
+  function is_interface(t:String) return _list_of_interfaces.indexOf(t)>=0;
+  function is_object_type(t:String) return switch (_types_by_name[t]) {
+    case TStruct(_): !is_interface(t);
+    default: false;
+  }
+
+  // Not recursive because interfaces can't implement interfaces
+  function implements_interface(t:String, i:String)
+  return is_interface(i) &&
+         _interfaces_implemented.exists(t) &&
+         _interfaces_implemented[t].indexOf(i)>=0;
+
+  // Not recursive because unions must only consist of Object types
+  function is_member_of_union(t:String, u:String) {
+    if (!is_union(u)) return false;
+    for (member in _list_of_unions[u]) if (member==t) return true;
+    return false;
+  }
+
+  function check_constraint(obj_type:String, constraint_type:String)
+  {
+    // Umm, sure you can fragment on the current type
+    if (obj_type==constraint_type) return true;
+
+    if (!is_object_type(obj_type)) throw 'Check_constraint is only valid on Object types, not ${ obj_type }';
+
+    // If constraint_type is an interface, obj_type must implement it to satisfy constraint:
+    if (is_interface(constraint_type)) {
+      return implements_interface(obj_type, constraint_type);
+    }
+
+    // If constraint_type is a union, obj_type must be a member:
+    if (is_union(constraint_type)) {
+      return _list_of_unions[constraint_type].indexOf(obj_type)>=0;
+    }
+
+    return false;
+  }
+
+  function resolve_fragment_nodes(selections:Array<SelectionNode>,
+                                  ancestor_types:Array<String>,
+                                  constrained_fields:Array<ConstrainedFieldType>)
+  {
+    if (selections==null || selections.length==0) return;
+
+    for (sel_node in selections) {
+      if (sel_node.kind==Kind.FIELD) {
+        var field = cast sel_node;
+        constrained_fields.push({ constraints:ancestor_types, field_node:field, usage:0 });
+      } else if (sel_node.kind==Kind.FRAGMENT_SPREAD || sel_node.kind==Kind.INLINE_FRAGMENT) {
+        var info = get_fragment_info(sel_node);
+        var next_ancestor_types = ancestor_types.slice(0);
+        next_ancestor_types.push(info.concrete);
+        resolve_fragment_nodes(info.selectionSet.selections, next_ancestor_types, constrained_fields);
+      }
+    }
+  }
+
+  function get_possible_object_types_from(base_type)
+  {
+    if (is_interface(base_type)) { // return all object types that implement base_type
+      var rtn = [];
+      for (t in _interfaces_implemented.keys()) {
+        var ifs = _interfaces_implemented[t];
+        if (ifs.indexOf(base_type)>=0) rtn.push(t);
+      }
+      if (rtn.length==0) {
+        throw 'Query or fragment on interface ${ base_type }, did not find any Object types that implement it!';
+      }
+      return rtn;
+    }
+
+    if (is_union(base_type)) { // return all member object types of union base_type
+      var rtn = [];
+      for (member in _list_of_unions[base_type]) {
+        if (!is_object_type(member)) 'Union ${ base_type } may not contain any type (${ member }) other than object types, per GraphQL spec';
+        rtn.push(member);
+      }
+      return rtn;
+    }
+
+    switch (_types_by_name[base_type]) {
+      case TStruct(_): return [base_type];
+      default: throw 'Cannot create fragment or operation on non-Object type ${ base_type }';
+    }
+  }
+
   function generate_type_based_on_selection_set(type_name:String,
                                                 op_name:String,
                                                 sel_set:{ selections:Array<SelectionNode> },
                                                 base_type:String,
                                                 depth:Int=0):GQLTypeDefinition
   {
-    var fields = new StringMapAA<GQLFieldType>();
+    if (_basic_types.indexOf(base_type)>=0) throw 'Cannot create a fragment or operation ${ op_name } on a basic type, ${ base_type }';
 
-    // Determine possible types, based on fragments. If multiple types,
-    // then we generate a union.
-    var possible_types = [ base_type ];
-    for (sel_node in sel_set.selections) {
-      if ((cast sel_node).typeCondition!=null) {
-        var possible = get_fragment_tname(cast sel_node);
-        if (possible_types.indexOf(possible)<0) possible_types.push(possible);
-      }
-    }
+    // var fields = new StringMapAA<GQLFieldType>();
 
-    var type_path = [ base_type ];
+    var possible_object_types = get_possible_object_types_from(base_type);
 
-    for (sel_node in sel_set.selections) {
-      switch (sel_node.kind) { // FragmentSpread | Field | InlineFragment
-      case Kind.FIELD:
-        var field_node:FieldNode = cast sel_node;
+    // Recursively find fields under all fragments
+    var constrained_fields:Array<ConstrainedFieldType> = [];
+    resolve_fragment_nodes(sel_set.selections, [], constrained_fields);
 
-        var name:String = field_node.name.value;
-        var alias:String = field_node.alias==null ? name : field_node.alias.value;
-
-        var next_type_path = type_path.slice(0);
-        next_type_path.push(name);
-        var resolved = resolve_field(next_type_path, op_name);
-        var type = resolve_type(resolved.type);
-
-        switch type {
-          case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
-            if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
-            fields[alias] = resolved;
-          case TStruct(tname, tfields):
-            if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
-
-            var sub_type_name = (depth==0 && StringTools.endsWith(type_name, '_Result')) ?
-              StringTools.replace(type_name, '_Result', '_InnerResult') : type_name+'__'+name;
-
-            var sub_type = generate_type_based_on_selection_set(sub_type_name, op_name, field_node.selectionSet, tname, depth+1);
-            var f = { type:null, is_array:resolved.is_array, is_optional:resolved.is_optional };
-            fields[alias] = f;
-            /*if (sub_type.has_union_field()) {
-            } else */if (depth==0) { // Make separate, named type for first-level of query
-              f.type = TPath(sub_type_name);
-            } else { // merge into my type
-              _types_by_name.remove(sub_type_name);
-              _defined_types.remove(sub_type_name);
-              f.type = TAnon(sub_type);
-            }
-          case TUnion(tname, _):
-            if (field_node.selectionSet!=null) throw 'Hmm, do we allow specifying sub-fields of union ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
-            fields[alias] = resolved;
+    // Populate fields into possible_object_types
+    var field_nodes_per_object_type = new StringMapAA<Array<SelectionNode>>();
+    for (cf in constrained_fields) {
+      for (obj_type in possible_object_types) {
+        var valid = true;
+        for (constraint in cf.constraints) {
+          if (!check_constraint(obj_type, constraint)) {
+            valid = false;
+            break;
+          }
         }
-        case Kind.INLINE_FRAGMENT:
-          // Handled above
-        case Kind.FRAGMENT_SPREAD:
-          // Handled above
-        default: throw 'Unhandled sel_node kind ${ sel_node.kind }';
+        if (valid) {
+          cf.usage++;
+          if (!field_nodes_per_object_type.exists(obj_type)) field_nodes_per_object_type[obj_type] = [];
+          field_nodes_per_object_type[obj_type].push(cf.field_node);
+        }
       }
     }
 
-    if (possible_types.length>1) {
-      generate_union_of_types(possible_types, type_name);
+    // Warn on unselected obj_types, and unused field specifications
+    for (obj_type in possible_object_types) {
+      if (!field_nodes_per_object_type.exists(obj_type)) {
+        error('Error: fragment or op ${ op_name } selected no fields for possible object type ${ obj_type }');
+      }
+    }
+    for (cf in constrained_fields) {
+      if (cf.usage==0) {
+        error('Error: fragment or op ${ op_name } specified field ${ (cast cf.field_node).name.value } that didn\'t get used in possible types [${ possible_object_types.join(", ") }] via constraints [${ cf.constraints.join(", ") }]');
+      }
+    }
+
+    var fields_per_object_type = new StringMapAA<StringMapAA<GQLFieldType>>();
+
+    var defined_names = [];
+    for (obj_type in possible_object_types) {
+      var fields = new StringMapAA<GQLFieldType>();
+      fields_per_object_type[obj_type] = fields;
+      var type_path = [ obj_type ];
+      var define_name = (possible_object_types.length==1) ? type_name : type_name+'_ON_'+obj_type;
+      defined_names.push(define_name);
+      define_type(TStruct(define_name, fields));
+
+      var ignore_duplicates = [];
+
+      for (sel_node in field_nodes_per_object_type[obj_type]) {
+        switch (sel_node.kind) { // FragmentSpread | Field | InlineFragment
+        case Kind.FIELD:
+          var field_node:FieldNode = cast sel_node;
+  
+          var name:String = field_node.name.value;
+          var alias:String = field_node.alias==null ? name : field_node.alias.value;
+
+          // Ignore fields specified more than once (with the same alias)
+          var dup_key = '$name -> $alias';
+          if (ignore_duplicates.indexOf(dup_key)>=0) continue;
+          ignore_duplicates.push(dup_key);
+
+
+          var next_type_path = type_path.slice(0);
+          next_type_path.push(name);
+          var resolved = resolve_field(next_type_path, op_name);
+          var type = resolve_type(resolved.type);
+  
+          switch type {
+            case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
+              if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
+              fields[alias] = resolved;
+            case TStruct(tname, tfields):
+              if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
+  
+              var sub_type_name = (depth==0 && StringTools.endsWith(type_name, '_Result')) ?
+                StringTools.replace(type_name, '_Result', '_InnerResult') : type_name+'__'+name;
+  
+              var sub_type = generate_type_based_on_selection_set(sub_type_name, op_name, field_node.selectionSet, tname, depth+1);
+              var f = { type:null, is_array:resolved.is_array, is_optional:resolved.is_optional };
+              fields[alias] = f;
+              if (is_union(sub_type_name)) {
+                f.type = TPath(sub_type_name);
+              } else if (depth==0) { // Make separate, named type for first-level of query
+                f.type = TPath(sub_type_name);
+              } else { // undefine and merge into my type
+                _types_by_name.remove(sub_type_name);
+                _defined_types.remove(sub_type_name);
+                f.type = TAnon(sub_type);
+              }
+            case TUnion(tname, _):
+              if (field_node.selectionSet!=null) throw 'Hmm, do we allow specifying sub-fields of union ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
+              fields[alias] = resolved;
+          }
+          case Kind.INLINE_FRAGMENT | Kind.FRAGMENT_SPREAD: throw 'Should not get fragment nodes here...';
+          default: throw 'Unhandled sel_node kind ${ sel_node.kind }';
+        }
+      }
+    }
+
+    if (possible_object_types.length>1) {
+      generate_union_of_types(defined_names, type_name);
       return _types_by_name[type_name];
     } else {
-      define_type(TStruct(type_name, fields));
       return _types_by_name[type_name];
     }
     
@@ -802,6 +995,7 @@ typedef OpVariables = {
   variables:Array<VariableDefinitionNode>
 };
 
+typedef ConstrainedFieldType = { constraints:Array<String>, field_node:SelectionNode, usage:Int }
 
 // - - - -
 // Utils
@@ -835,3 +1029,142 @@ abstract StringMapAA<T>(haxe.ds.StringMap<T>) from haxe.ds.StringMap<T> to haxe.
     return v;
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//
+//
+//  // Determine to which concrete types the selection nodes (fields and fragments)
+//  // will go into. The result will be a map of concrete types to field nodes,
+//  // with no fragment nodes and no union concrete types.
+//  function __resolve_fragment_nodes(debug_err_prefix:String,
+//                                  type:String,
+//                                  selections:Array<SelectionNode>,
+//                                  ancestor_types:Array<String>=null)
+//  {
+//    if (ancestor_types==null) ancestor_types = [];
+//    var type_is_interface = _list_of_interfaces.indexOf(type)>=0;
+//    var type_is_union = _list_of_unions.exists(type);
+//
+//    var concrete_types_and_interfaces = new StringMapAA<Array<SelectionNode>>();
+//
+//    var type_is_structure = switch _types_by_name[type] {
+//      // types and interfaces, not unions, scalars, or basics
+//      case TStruct(_):
+//        concrete_types_and_interfaces[type] = [];
+//        true;
+//      default:
+//        false;
+//    }
+//
+//    // Process:
+//    //
+//    // Step 1) for all selection nodes
+//    //  - if Field, ensure is_structure (TODO: or union of all structures that supply field)
+//    //    and place fields into cti[type]
+//    //  - if Fragment:
+//    //    - if on unifies to type, recursive resolve on concrete_type, and
+//    //      merge resulting cti into my cti (merge errors? aliases? etc?)
+//    //    - if not unifies, warn unreachable? ignore selections
+//
+//    for (sel_node in selections) {
+//      if (sel_node.kind==Kind.FIELD) {
+//        var field = cast sel_node;
+//        if (!type_is_structure) {
+//          var suffix = type_is_union ? ' (TODO: support union, where all members supply this field?)' : '';
+//          throw '${ debug_err_prefix }Cannot query fields ${ field.name.value } to non-struct ${ type }${ suffix }';
+//        }
+//        concrete_types_and_interfaces[type].push(field);
+//      } else if (sel_node.kind==Kind.FRAGMENT_SPREAD || sel_node.kind==Kind.INLINE_FRAGMENT) {
+//        var concrete = get_concrete_type_name(sel_node);
+//        if (valid_subtype_of(concrete, type)) {
+//          for (at in ancestor_types) {
+//            if (!valid_subtype_of(concrete, at)) throw '${ debug_err_prefix }Fragment unification of ${ concrete } to ${ at } failed while parsing fragment ${ sel_node }';
+//          }
+//          var next_ancestor_types = ancestor_types.slice(0);
+//          next_ancestor_types.push(concrete);
+//          merge_cti(resolve_fragment_nodes(debug_err_prefix, concrete, sel_node, next_ancestor_types);
+//        } else {
+//        }
+//      } else {
+//        throw '${ debug_err_prefix }Unhandled selection node kind: ${ sel_node.kind }';
+//      }
+//    }
+//
+//    // Step 2)
+//    //    - for all cti interface types, inject them into any other non-interface
+//    //      types that implement them.
+//    //    - if the base type itself implemented the interface, remove it from the
+//    //      cti. And warn -- unnecessary fragment applies to base type.
+//
+//
+//    // fields go into currently targeted type
+//    // concrete types:
+//    //  - must [ be base_type || be implemented by base_type(interface) ]
+//    //  - that match an existing type will get subsumed
+//    //  - otherwise, create a new concrete entry
+//    // concrete interfaces:
+//    //  - must be implemented by the current 'base_type'
+//    //  - will get subsumed into *every concrete type that implements it
+//    //  - iff base type doesn't implement, will create their own entry
+//
+//    // *The above rules require that we operate on types first, then interfaces.
+//
+//    function consider_interface_fragment(interface_name, node)
+//    {
+//      var base_implements:Bool = _interfaces_implemented[base_type].indexOf(interface_name)>=0;
+//
+//      // Inject into any type that implements this interface
+//      for (concrete in concrete_types_and_interfaces.keys()) {
+//        if (_interfaces_implemented[concrete].indexOf(interface_name)>=0) {
+//          inject_fragment(concrete_types_and_interfaces[concrete], node)
+//        }
+//      }
+//
+//      // If base doesn't implement, interface creates its own entry
+//      if (!base_implements) {
+//        concrete_types_and_interfaces[interface_name] = [];
+//        inject_fragment(concrete_types_and_interfaces[interface_name], node)
+//      }
+//    }
+//
+//    for (step in [1,2,3]) {
+//      for (sel_node in base_selections) {
+//        // Step 1: fields go directly into the base type set
+//        if (step==1 && sel_node.kind==Kind.FIELD) {
+//          concrete_types_and_interfaces[base_type].push(sel_node);
+//        }
+//        // Step 2: consider only fragments on concrete types
+//        if (step==2 && sel_node.kind!=Kind.FIELD) {
+//          var concrete = get_concrete_type_name(sel_node);
+//          if (_list_of_interfaces.indexOf(concrete)<0) {
+//            // Inject type fragment:
+//            inject_fragment(base_type, concrete_types_and_interfaces, sel_node)
+//          }
+//        }
+//        // Step 3: consider only fragments on concrete interfaces
+//        if (step==3 && sel_node.kind!=Kind.FIELD) {
+//          var concrete = get_concrete_type_name(sel_node);
+//          if (_list_of_interfaces.indexOf(concrete)>=0) {
+//            consider_interface_fragment(concrete, sel_node);
+//          }
+//        }
+//      }
+//    }
+//  }
