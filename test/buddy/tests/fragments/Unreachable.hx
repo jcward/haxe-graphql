@@ -28,7 +28,7 @@ query HumanById($$id:ID!) {
       name
       ... on Droid {
         # This condition is never reachable, because there is no relationship
-        # that allows constraints Human and then Droid. Will error in geneartor.
+        # that allows constraints Human and then Droid. Will error in generator.
         unreachable_field
       }
     }

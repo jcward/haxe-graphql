@@ -6,15 +6,14 @@ Takes GraphQL schema definition AST and turn it into Haxe code.
 GraphQL schema support:
 - [x] Schema
   - [x] type, interface, union, enum, scalar
-    - [ ] review covariance of interface field and type field
+  - [x] interface validation (with covariance)
   - [x] lists and not-nulls
   - [x] scalar
   - [x] Arguments (generates type for arguments)
-- [x] Operations (geneartes var types and result types)
+- [x] Operations (generates var types and result types)
   - [x] Queries
   - [x] Mutations
-  - [ ] Query fragments
-- [ ] Optionally generate classes / interfaces
+  - [x] Query fragments
 
 Example
 ----
