@@ -22,6 +22,7 @@ Development sponsored by: [www.wootmath.com](https://www.wootmath.com) [simbulus
 Release notes: 
 ---
 
+ 0.0.15 - Implemented fragment support and interface checking /w covariance  
  0.0.14 - Fixed query result array types / issue #23  
  0.0.13 - Mutation support enabled / issue #20  
  0.0.12 - Enums now generate @:enum abstract(String) / issue #22  
