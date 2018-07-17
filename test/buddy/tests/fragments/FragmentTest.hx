@@ -19,11 +19,11 @@ interface Job {
   title:String!
 }
 
-##  type Programmer implements Job {
-##    title:String!
-##    programmer_id:ID!
-##    favorite_language: String!
-##  }
+type Programmer implements Job {
+  title:String!
+  programmer_id:ID!
+  favorite_language: String!
+}
 
 type Plumber implements Job {
   title:String!
@@ -98,8 +98,8 @@ fragment PlumberDetails on Plumber {
         parser = new graphql.parser.Parser(gql);
       });
 
-      it("should parse 11 definitions from this schema", {
-        parser.document.definitions.length.should.be(11);
+      it("should parse 12 definitions from this schema", {
+        parser.document.definitions.length.should.be(12);
       });
 
       var haxe_code:String;
@@ -111,42 +111,27 @@ fragment PlumberDetails on Plumber {
       it("...and the query result and inner result union types should be present...", {
         haxe_code.should.contain("typedef OP_ByName_Result");
         haxe_code.should.contain("abstract OP_ByName_InnerResult(Dynamic)");
+        haxe_code.should.contain("abstract OP_ByName_InnerResult__job(Dynamic)");
       });
 
-      var type_OP_ByName_InnerResult:String = "";
-      it("...and the inner result type should have correct types, arrays, and optionality.", {
-        var capture = false;
-        for (line in haxe_code.split("\n")) {
-          if (line.indexOf('abstract OP_ByName_InnerResult')>=0) capture = true;
-          if (capture==true && line=='}') capture = false;
-          if (capture) type_OP_ByName_InnerResult += line + "\n";
-        }
+      it("...and the inner result type should have correct types.", {
+        var type_OP_ByName_InnerResult = Main.find_type_in_code(haxe_code, 'abstract OP_ByName_InnerResult(Dynamic)');
 
         // inner result type:
         type_OP_ByName_InnerResult.should.contain('fromOP_ByName_InnerResult_ON_Dog');
         type_OP_ByName_InnerResult.should.contain('fromOP_ByName_InnerResult_ON_Person');
         type_OP_ByName_InnerResult.split(':from').length.should.be(3);
-        trace(haxe_code);
       });
 
-      // it("...but its missing a union on the job type...", {
-      //   haxe_code.should.contain("abstract something, not sure yet...");
-      // });
+      it("...and the inner result job type should have correct types.", {
+        var type_OP_ByName_InnerResult__job = Main.find_type_in_code(haxe_code, 'abstract OP_ByName_InnerResult__job(Dynamic)');
+        // Main.print(type_OP_ByName_InnerResult__job);
 
-      // var vars_type_of_getReturnOfTheJediQuery:String = "";
-      // it("...and the vars type should have correct types and optionality.", {
-      //   var capture = false;
-      //   for (line in haxe_code.split("\n")) {
-      //     if (line.indexOf('typedef OP_GetReturnOfTheJedi_Vars')>=0) capture = true;
-      //     if (capture) vars_type_of_getReturnOfTheJediQuery += line + "\n";
-      //     if (capture==true && line=='}') capture = false;
-      //   }
-      //
-      //   // vars type:
-      //   vars_type_of_getReturnOfTheJediQuery.should.contain('typedef OP_GetReturnOfTheJedi_Vars');
-      //   vars_type_of_getReturnOfTheJediQuery.should.contain('?id : ID');
-      // });
-
+        // inner result type:
+        type_OP_ByName_InnerResult__job.should.contain('fromOP_ByName_InnerResult__job_ON_Plumber');
+        type_OP_ByName_InnerResult__job.should.contain('fromOP_ByName_InnerResult__job_ON_Programmer');
+        type_OP_ByName_InnerResult__job.split(':from').length.should.be(3);
+      });
 
       it("We can be write to /tmp/FragmentTest.hx...", function() {
         var exec_code = '
@@ -174,7 +159,7 @@ fragment PlumberDetails on Plumber {
         var p = new sys.io.Process("haxe", ["--cwd", "/tmp", "-x", "FragmentTest"]);
         var stdout = p.stdout.readAll().toString();
         var stderr = p.stderr.readAll().toString();
-        // TODO: stderr.should.contain('SOMETHING');
+        stderr.should.contain('Warning : OP_ByName_InnerResult');
         stdout.should.contain('and we executed');
       });
 

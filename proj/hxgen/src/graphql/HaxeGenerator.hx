@@ -405,9 +405,6 @@ class HaxeGenerator
       if (type.name==null) throw 'Expecting Named Type';
       values.push(type.name.value);
     }
-
-    _map_of_union_types[def.name.value] = values;
-
     generate_union_of_types(values, def.name.value);
   }
 
@@ -417,8 +414,9 @@ class HaxeGenerator
     if (tname==null) {
       values.sort(function(a,b) return a>b ? 1 : -1);
       tname = GENERATED_UNION_PREFIX+values.join(DEFAULT_SEPARATOR);
-      if (_defined_types.indexOf(tname)>=0) return tname;
+      if (_defined_types.indexOf(tname)>=0) throw 'Cannot redefine union $tname';
     }
+    _map_of_union_types[tname] = values;
     define_type(TUnion(tname, values));
     return tname;
   }

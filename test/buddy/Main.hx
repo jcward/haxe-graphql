@@ -23,4 +23,34 @@ class Main implements Buddy<[
 
                              // Github issue testcases
                              tests.issues.Issue23,
-]> {}
+]> {
+
+  public static function find_type_in_code(code:String, type:String):String
+  {
+    var result = '';
+    var capture = false;
+    for (line in code.split("\n")) {
+      if (line.indexOf(type)>=0) capture = true;
+      if (capture==true && line=='}') { capture = false; break; }
+      if (capture) result += line + "\n";
+    }
+    return result;
+  }
+
+  public static function print(msg:String, color=MAGENTA)
+  {
+    Sys.println(color + msg + DEFAULT);
+  }
+}
+
+@:enum abstract Color(String) {
+	var DEFAULT = '\033[0;37m';
+	var BLACK   = '\033[0;30m';
+	var RED     = '\033[31m';
+	var GREEN   = '\033[32m';
+	var YELLOW  = '\033[33m';
+	var BLUE    = '\033[1;34m';
+	var MAGENTA = '\033[1;35m';
+	var CYAN    = '\033[0;36m';
+	var WHITE   = '\033[1;37m';
+}
