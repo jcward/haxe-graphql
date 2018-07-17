@@ -64,7 +64,7 @@ type Person {
       });
 
       it("should generate an arg type for mutation insert", {
-        haxe.should.contain('typedef Args_Mutation_insert');
+        haxe.should.contain('typedef Args_Mutation__insert');
       });
 
     });

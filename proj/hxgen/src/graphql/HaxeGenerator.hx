@@ -30,6 +30,16 @@ typedef SomeNamedNode = { kind:String, name:NameNode };
 @:expose
 class HaxeGenerator
 {
+  private static var OP_PREFIX = 'OP_';
+  private static var OP_OUTER_SUFFIX = '_Result';
+  private static var OP_INNER_SUFFIX = '_InnerResult';
+  private static var OP_VARS_SUFFIX = '_Vars';
+  private static var FRAGMENT_PREFIX = 'Fragment_';
+  private static var UNION_SELECTION_SEPARATOR = '_ON_';
+  private static var ARGS_PREFIX = 'Args_';
+  private static var GENERATED_UNION_PREFIX = 'U_';
+  public static inline var DEFAULT_SEPARATOR = '__';
+
   private var _stderr_writer:StringWriter;
   private var _options:HxGenOptions;
 
@@ -84,7 +94,7 @@ class HaxeGenerator
   private function handle_args(type_path:Array<String>, args:FieldArguments) {
     if (args==null || args.length==0) return;
     for (a in args) {
-      var args_name = 'Args_${ type_path.join('Dot') }_${ a.field }';
+      var args_name = '${ ARGS_PREFIX }${ type_path.join(DEFAULT_SEPARATOR) }${ DEFAULT_SEPARATOR }${ a.field }';
       var args_obj:ObjectTypeDefinitionNode = {
         kind:Kind.OBJECT_TYPE_DEFINITION,
         name:{ value:args_name, kind:Kind.NAME },
@@ -106,7 +116,7 @@ class HaxeGenerator
     }
     var vars_obj:ObjectTypeDefinitionNode = {
       kind:Kind.OBJECT_TYPE_DEFINITION,
-      name:{ value:'OP_${ opv.op_name }_Vars', kind:Kind.NAME },
+      name:{ value:'${ OP_PREFIX }${ opv.op_name }${ OP_VARS_SUFFIX }', kind:Kind.NAME },
       fields:fields
     };
     ingest_tstruct_like_type(vars_obj);
@@ -253,7 +263,7 @@ class HaxeGenerator
   function write_fragment_as_haxe_typedef(def:ASTDefs.FragmentDefinitionNode)
   {
     var on_type = def.typeCondition.name.value;
-    var tname = 'Fragment_${ def.name.value }';
+    var tname = '${ FRAGMENT_PREFIX }${ def.name.value }';
     _named_fragment_concretes[tname] = on_type;
 
     // Fragments can have fragments... Do the order of these calls need to be determinant?
@@ -406,7 +416,7 @@ class HaxeGenerator
   {
     if (tname==null) {
       values.sort(function(a,b) return a>b ? 1 : -1);
-      tname = 'U__'+values.join('_');
+      tname = GENERATED_UNION_PREFIX+values.join(DEFAULT_SEPARATOR);
       if (_defined_types.indexOf(tname)>=0) return tname;
     }
     define_type(TUnion(tname, values));
@@ -474,7 +484,7 @@ class HaxeGenerator
   {
     var info = null;
     if (sel_node.kind==Kind.FRAGMENT_SPREAD) {
-      var name:String = 'Fragment_'+(cast sel_node).name.value;
+      var name:String = FRAGMENT_PREFIX+(cast sel_node).name.value;
       var concrete = _named_fragment_concretes[name];
       if (concrete==null) throw 'Error, did not find fragment spread named: ${ name }';
       info = {
@@ -652,7 +662,7 @@ class HaxeGenerator
       var fields = new StringMapAA<GQLFieldType>();
       fields_per_object_type[obj_type] = fields;
       var type_path = [ obj_type ];
-      var define_name = (possible_object_types.length==1) ? type_name : type_name+'_ON_'+obj_type;
+      var define_name = (possible_object_types.length==1) ? type_name : type_name+UNION_SELECTION_SEPARATOR+obj_type;
       defined_names.push(define_name);
       define_type(TStruct(define_name, fields));
 
@@ -683,8 +693,8 @@ class HaxeGenerator
             case TStruct(tname, tfields):
               if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
   
-              var sub_type_name = (depth==0 && StringTools.endsWith(type_name, '_Result')) ?
-                StringTools.replace(type_name, '_Result', '_InnerResult') : type_name+'__'+name;
+              var sub_type_name = (depth==0 && StringTools.endsWith(type_name, OP_OUTER_SUFFIX)) ?
+                StringTools.replace(type_name, OP_OUTER_SUFFIX, OP_INNER_SUFFIX) : type_name+DEFAULT_SEPARATOR+name;
   
               var sub_type = generate_type_based_on_selection_set(sub_type_name, op_name, field_node.selectionSet, tname, depth+1);
               var f = { type:null, is_array:resolved.is_array, is_optional:resolved.is_optional };
@@ -735,7 +745,7 @@ class HaxeGenerator
     }
 
     // gen type based on selection set
-    generate_type_based_on_selection_set('OP_${ op_name }_Result',
+    generate_type_based_on_selection_set('${ OP_PREFIX }${ op_name }${ OP_OUTER_SUFFIX }',
                                          op_name,
                                          def.selectionSet,
                                          op_root_type);
@@ -825,7 +835,7 @@ class GQLTypeTools
   public static var bool_collision = false;
   public static function gql_to_haxe_type_name_transforms(tname:String):String
   {
-    if (tname=="Bool" && bool_collision) return "Bool_";
+    if (tname=="Bool" && bool_collision) return "Bool"+HaxeGenerator.DEFAULT_SEPARATOR;
     if (tname=="Boolean") return "Bool";
     return tname;
   }

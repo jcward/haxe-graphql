@@ -34,10 +34,10 @@ class BoolTest extends BuddySuite
         haxe = graphql.HaxeGenerator.parse(parser.document).stdout;
 
         // Core type collision, must get renamed
-        haxe.should.contain('typedef Bool_ =');
+        haxe.should.contain('typedef Bool__ =');
         haxe.should.not.contain('typedef Bool =');
         haxe.should.contain('actual_boolean : Bool,');
-        haxe.should.contain('fake_bool : Bool_,');
+        haxe.should.contain('fake_bool : Bool__,');
         //Sys.println(haxe);
       });
 

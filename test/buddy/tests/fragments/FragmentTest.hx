@@ -1,4 +1,4 @@
-package tests.operations;
+package tests.fragments;
 
 import buddy.*;
 using buddy.Should;
@@ -18,6 +18,12 @@ union Being = Person | Dog
 interface Job {
   title:String!
 }
+
+##  type Programmer implements Job {
+##    title:String!
+##    programmer_id:ID!
+##    favorite_language: String!
+##  }
 
 type Plumber implements Job {
   title:String!
@@ -50,7 +56,7 @@ query ByName($$name:String!) {
     # Inline Fragment on a ceratin implementor of this interface
     ... on Person {
       ...PersonDetails # named fragment on this expected type
- 
+
       job {
         title
         ... on Plumber {
@@ -59,7 +65,7 @@ query ByName($$name:String!) {
         }
       }
     }
- 
+
     ... on Dog {
       dog_id
     }
@@ -107,22 +113,26 @@ fragment PlumberDetails on Plumber {
         haxe_code.should.contain("abstract OP_ByName_InnerResult(Dynamic)");
       });
 
-      // var result_type_of_ByName:String = "";
-      // it("...and the inner result type should have correct types, arrays, and optionality.", {
-      //   var capture = false;
-      //   for (line in haxe_code.split("\n")) {
-      //     if (line.indexOf('typedef OP_ByName_InnerResult')>=0) capture = true;
-      //     if (capture==true && line=='}') capture = false;
-      //     if (capture) result_type_of_getReturnOfTheJediQuery += line + "\n";
-      //   }
-      //  
-      //   // inner result type:
-      //   result_type_of_getReturnOfTheJediQuery.should.contain('title : ID');
-      //   result_type_of_getReturnOfTheJediQuery.should.not.contain('?title : ID');
-      //   result_type_of_getReturnOfTheJediQuery.should.contain('?director : {');
-      //   result_type_of_getReturnOfTheJediQuery.should.contain('?releaseDate : Date');
+      var type_OP_ByName_InnerResult:String = "";
+      it("...and the inner result type should have correct types, arrays, and optionality.", {
+        var capture = false;
+        for (line in haxe_code.split("\n")) {
+          if (line.indexOf('abstract OP_ByName_InnerResult')>=0) capture = true;
+          if (capture==true && line=='}') capture = false;
+          if (capture) type_OP_ByName_InnerResult += line + "\n";
+        }
+
+        // inner result type:
+        type_OP_ByName_InnerResult.should.contain('fromOP_ByName_InnerResult_ON_Dog');
+        type_OP_ByName_InnerResult.should.contain('fromOP_ByName_InnerResult_ON_Person');
+        type_OP_ByName_InnerResult.split(':from').length.should.be(3);
+        trace(haxe_code);
+      });
+
+      // it("...but its missing a union on the job type...", {
+      //   haxe_code.should.contain("abstract something, not sure yet...");
       // });
-      //  
+
       // var vars_type_of_getReturnOfTheJediQuery:String = "";
       // it("...and the vars type should have correct types and optionality.", {
       //   var capture = false;
@@ -131,7 +141,7 @@ fragment PlumberDetails on Plumber {
       //     if (capture) vars_type_of_getReturnOfTheJediQuery += line + "\n";
       //     if (capture==true && line=='}') capture = false;
       //   }
-      //  
+      //
       //   // vars type:
       //   vars_type_of_getReturnOfTheJediQuery.should.contain('typedef OP_GetReturnOfTheJedi_Vars');
       //   vars_type_of_getReturnOfTheJediQuery.should.contain('?id : ID');
@@ -172,4 +182,3 @@ fragment PlumberDetails on Plumber {
   }
 
 }
-

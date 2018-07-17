@@ -33,9 +33,9 @@ class StarWarsTest extends BuddySuite
         haxe.should.contain('@:enum abstract LengthUnit');
         haxe.should.contain('typedef Human');
         haxe.should.contain('typedef Droid');
-        haxe.should.contain('typedef Args_Droid_friendsConnection');
+        haxe.should.contain('typedef Args_Droid__friendsConnection');
         haxe.should.contain('typedef FriendsEdge');
-        haxe.should.contain('typedef Args_Starship_length');
+        haxe.should.contain('typedef Args_Starship__length');
       });
 
       it("...and can be written to /tmp/StarWars.hx...", function() {

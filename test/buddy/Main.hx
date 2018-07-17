@@ -14,8 +14,12 @@ class Main implements Buddy<[
                              tests.operations.QueryTypeGeneration,
                              tests.operations.MutationTypeGeneration,
                              tests.operations.UnnamedQuery,
-                             tests.operations.FragmentTest,
                              tests.star_wars.StarWarsTest,
+
+                             tests.fragments.FragmentTest,
+                             tests.fragments.Collapse,
+                             tests.fragments.Unreachable,
+                             tests.fragments.EmptyFragment,
 
                              // Github issue testcases
                              tests.issues.Issue23,
