@@ -8,6 +8,8 @@ class Main implements Buddy<[
                              tests.basic.ValidHaxe,
                              tests.basic.Reporting,
                              tests.basic.BasicSchema,
+                             tests.basic.CovarianceUnion,
+                             tests.basic.CovarianceInterface,
                              tests.args.ArgsDefaultValues,
                              tests.operations.BasicQuery,
                              tests.operations.ArgsQuery,

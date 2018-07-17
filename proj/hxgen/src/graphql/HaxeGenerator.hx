@@ -22,9 +22,6 @@ typedef SchemaMap = {
   mutation_type:String
 }
 
-// key String is field_name
-typedef InterfaceType = haxe.ds.StringMap<ComplexType>;
-
 typedef SomeNamedNode = { kind:String, name:NameNode };
 
 @:expose
@@ -42,8 +39,6 @@ class HaxeGenerator
 
   private var _stderr_writer:StringWriter;
   private var _options:HxGenOptions;
-
-  // private var _interfaces = new StringMapAA<InterfaceType>();
 
   private var _fragment_defs = new Array<ASTDefs.FragmentDefinitionNode>();
   private var _defined_types = [];
@@ -129,18 +124,9 @@ class HaxeGenerator
 
     var root_schema:SchemaMap = null;
 
-    // First pass: parse interfaces and schema def only
-    // - when outputing typedefs, types will "> extend" interfaces, removing duplicate fields
-    // - TODO: is this proper behavior? Or can type field be a super-set of the interface field?
-    //         see spec: http://facebook.github.io/graphql/October2016/#sec-Object-type-validation
-    //         "The object field must be of a type which is equal to or a sub‐type of the
-    //          interface field (covariant)."
+    // First pass: parse the schema def only
     for (def in doc.definitions) {
       switch (def.kind) {
-        // case ASTDefs.Kind.INTERFACE_TYPE_DEFINITION:
-        //   var args = write_interface_as_haxe_base_typedef(cast def);
-        //   newline();
-        //   handle_args([get_def_name(cast def)], args);
         case ASTDefs.Kind.SCHEMA_DEFINITION:
           if (root_schema!=null) error('Error: cannot specify two schema definitions');
           root_schema = ingest_schema_def(cast def);
@@ -182,7 +168,7 @@ class HaxeGenerator
       }
     }
 
-    // Third pass: genearte fragment definitions
+    // Third pass: generate fragment definitions
     for (def in doc.definitions) switch def.kind {
       case ASTDefs.Kind.FRAGMENT_DEFINITION:
         write_fragment_as_haxe_typedef(cast def);
@@ -203,10 +189,67 @@ class HaxeGenerator
         error('Error: unknown type: '+t);
       }
     }
+
+    // Ensure all interface implementations are valid, including
+    // type checking (with covariance)
+    ensure_interface_implementations();
+
     return {
       stderr:_stderr_writer.toString(),
       stdout:print_to_stdout()
     };
+  }
+
+  private function ensure_interface_implementations()
+  {
+    for (tname in _types_by_name.keys()) {
+      if (is_object_type(tname) && _interfaces_implemented.exists(tname)) {
+        for (iname in _interfaces_implemented[tname]) {
+          //trace('$tname implements $iname');
+          var tfields = switch _types_by_name[tname] {
+            case TStruct(name, fields): fields;
+            default: throw 'Object type $tname expected to have fields!';
+          }
+          var ifields = switch _types_by_name[iname] {
+            case TStruct(name, fields): fields;
+            default: throw 'Interface $iname expected to have fields!';
+          }
+          for (field_name in ifields.keys()) {
+            var ifield = ifields[field_name];
+            var tfield = tfields[field_name];
+            if (tfield==null) throw 'Type $tname implements $iname, but doesn\'t provide field $field_name';
+            if (ifield.is_array != tfield.is_array) throw 'Type $tname implements $iname, but the type of field $field_name doesn\'t match (List vs non-List)';
+            if (ifield.is_optional != tfield.is_optional) throw 'Type $tname implements $iname, but the type of field $field_name doesn\'t match (nullable vs non-nullable)';
+
+            // These should be non-user-facing errors:
+            var ifield_type_name = switch (ifield.type) { case TPath(n): n; default: throw 'Interfaces can only specify TPaths'; }
+            var tfield_type_name = switch (tfield.type) { case TPath(n): n; default: throw 'Interface implementations can only specify TPaths'; }
+
+            if (ifield_type_name!=tfield_type_name) { // check for covariance
+              // Since interfaces can't implement interfaces, and unions can only contain Object types,
+              // the only two flavors of covariance supported are:
+              //  - interface specifies an interface, type specifies an object type
+              //  - interface specifies an union, type specifies an object type
+              var err = 'Covariance failed on $tname field [$field_name:$tfield_type_name] for interface $iname [$field_name:$ifield_type_name]';
+
+              if ( !is_object_type(tfield_type_name) ) {
+                throw err;
+              } else {
+                if (is_interface(ifield_type_name) && implements_interface(tfield_type_name, ifield_type_name)) {
+                  // covariance ok
+                  // trace('COVAIRANCE OK! $tfield_type_name implements $ifield_type_name');
+                } else if (is_union(ifield_type_name) && is_member_of_union(tfield_type_name, ifield_type_name)) {
+                  // covariance ok
+                  // trace('COVAIRANCE OK! $tfield_type_name is a member of $ifield_type_name');
+                } else {
+                  throw err;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   private function get_def_name(def) return def.name.value;
@@ -251,15 +294,6 @@ class HaxeGenerator
     return field_type;
   }
 
-  /* -- TODO: REVIEW: http://facebook.github.io/graphql/October2016/#sec-Object-type-validation
-                      sub-typing seems to be allowed... */
-  function field_types_equivalent(field_type_0:GQLFieldType, field_type_1:GQLFieldType):Bool
-  {
-    return field_type_0.is_array==field_type_1.is_array &&
-           field_type_0.is_optional==field_type_1.is_optional &&
-           field_type_0.type==field_type_1.type;
-  }
-
   function write_fragment_as_haxe_typedef(def:ASTDefs.FragmentDefinitionNode)
   {
     var on_type = def.typeCondition.name.value;
@@ -283,9 +317,6 @@ class HaxeGenerator
   {
     var args:FieldArguments = [];
 
-    // var interface_fields_from = new StringMapAA<String>();
-    // var skip_interface_fields = new StringMapAA<ComplexType>();
-
     // Per GraphQL spoec: only Object types may implement interfaces
     if (def.kind==ASTDefs.Kind.OBJECT_TYPE_DEFINITION) {
       _interfaces_implemented[def.name.value] = [];
@@ -293,23 +324,6 @@ class HaxeGenerator
         for (intf in def.interfaces) {
           var ifname = intf.name.value;
           _interfaces_implemented[def.name.value].push(ifname);
-
-          // TODO: bring back interface validation:
-          // if (!_interfaces.exists(ifname)) throw 'Requested interface '+ifname+' (implemented by '+def.name.value+') not found';
-          // var int_def = _interfaces[ifname];
-
-          // for (field_name in int_def.keys()) {
-          //   if (!skip_interface_fields.exists(field_name)) {
-          //     skip_interface_fields[field_name] = int_def.get(field_name);
-          //     interface_fields_from[field_name] = ifname;
-          //   } else {
-          //     // Two interfaces could imply the same field name... in which
-          //     // case we need to ensure the "more specific" definition is kept.
-          //     if (!field_types_equivalent(int_def.get(field_name), skip_interface_fields[field_name])) {
-          //       throw 'Type '+def.name.value+' inherits field '+field_name+' from multiple interfaces ('+ifname+', '+interface_fields_from[field_name]+'), the types of which do not match.';
-          //     }
-          //   }
-          // }
         }
       }
     }
@@ -318,7 +332,6 @@ class HaxeGenerator
     define_type(TStruct(def.name.value, fields));
 
     for (field in def.fields) {
-      // if (field.name.value=='id') debugger;
       var type = parse_field_type(field.type);
       var field_name = field.name.value;
       fields[field_name] = type; //.clone().follow();
@@ -326,63 +339,10 @@ class HaxeGenerator
       if (field.arguments!=null && field.arguments.length>0) {
         args.push({ field:field_name, arguments:field.arguments });
       }
-
-/*
-      if (skip_interface_fields.exists(field_name)) {
-        // Field is inherited from an interface, ensure the types match
-        if (!field_types_equivalent(type, skip_interface_fields.get(field_name))) {
-          throw 'Type '+def.name.value+' defines '+field_name+':'+type.toString(true)+', but Interface '+interface_fields_from[field_name]+' requires '+field_name+':'+interface_fields_from[field_name].toString();
-        }
-      } else {
-        // Not inherited from an interface, include it in this typedef
-        var type_str = '';
-        var outer_optional = type.optional;
-        type.optional = false;
-        if (short_format) {
-          // Outer optional gets converted to ?
-          type_str = (outer_optional ? '?' : '') + field_name + ': '+type.toString(_options.disable_null_wrappers==true) + ',';
-        } else {
-          // Outer optional gets converted to @:optional
-          type_str = (outer_optional ? '@:optional' : '') + 'var ' + field_name + ': ' + type.toString(_options.disable_null_wrappers==true) + ';';
-        }
-        _stdout_writer.append('  '+type_str);
-      }
-*/
     }
-/*
-    if (short_format) _stdout_writer.chomp_trailing_comma(); // Haxe doesn't care, but let's be tidy
-    _stdout_writer.append('}');
-*/
 
     return args;
   }
-
-//  function write_interface_as_haxe_base_typedef(def:ASTDefs.ObjectTypeDefinitionNode):FieldArguments
-//  {
-//    var args:FieldArguments = [];
-//
-//    if (def.name==null || def.name.value==null) throw 'Expecting interface must have a name';
-//    var name = def.name.value;
-//    if (_interfaces.exists(name)) throw 'Duplicate interface named '+name;
-//
-//    var intf = new StringMapAA<ComplexType>();
-//    for (field in def.fields) {
-//      var type = parse_field_type(field.type);
-//      var field_name = field.name.value;
-//      intf[field_name] = type;
-//
-//      if (field.arguments!=null && field.arguments.length>0) {
-//        args.push({ field:field_name, arguments:field.arguments });
-//      }
-//    }
-//
-//    _interfaces[name] = intf;
-//
-//    // Generate the interface like a type
-//    ingest_tstruct_like_type(def);
-//
-//    return args;
-//  }
 
   function ingest_enum_type_def(def:ASTDefs.EnumTypeDefinitionNode) {
     // trace('Generating enum: '+def.name.value);
@@ -430,7 +390,8 @@ class HaxeGenerator
       var op = Std.string(ot.operation);
       switch op {
         case "query" | "mutation": //  | "subscription": is "non-spec experiment"
-        var capitalized = op.substr(0,1).toUpperCase() + op.substr(1);
+        // See if we want to bring back this type alias later... It's really a "utility" alias...
+        //var capitalized = op.substr(0,1).toUpperCase() + op.substr(1);
         //_stdout_writer.append('typedef Schema${ capitalized }Type = ${ ot.type.name.value };');
         if (op=="query") rtn.query_type = ot.type.name.value;
         if (op=="mutation") rtn.mutation_type = ot.type.name.value;
@@ -797,11 +758,6 @@ class StringWriter
   public function is_empty() { return _output.length==0; }
 
   public function append(s) { _output.push(s); }
-
-  // Remove trailing comma from last String
-  public function chomp_trailing_comma() {
-    _output[_output.length-1] = ~/,$/.replace(_output[_output.length-1], '');
-  }
 
   public function toString():String return _output.join("\n");
 }
