@@ -810,7 +810,9 @@ class GQLTypeTools
           var inner = inner_fields[fname];
           fields.push(to_haxe_field(fname, inner));
         }
-        var field = { name:field_name, kind:FVar(TAnonymous(fields), null), meta:[], pos:FAKE_POS };
+        var ct = TAnonymous(fields);
+        if (gql_f.is_array) ct = TPath({ pack:[], name:'Array', params:[ TPType(ct) ] });
+        var field = { name:field_name, kind:FVar(ct, null), meta:[], pos:FAKE_POS };
         if (gql_f.is_optional) field.meta.push({ name:":optional", pos:FAKE_POS });
         return field;
 
