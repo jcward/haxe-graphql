@@ -31,22 +31,22 @@ type SomeType {
     describe("ArgsDefaultValues: The Parser and HaxeGenerator", {
 
       var parser:graphql.parser.Parser;
-      var haxe:String;
 
       it('should parse the document without error', {
         parser = new graphql.parser.Parser(gql);
-        var result = graphql.HaxeGenerator.parse(parser.document);
-        haxe = result.stdout;
       });
 
-      it("should parse 2 definitions from this schema", {
+      it("should parse 3 definitions from this schema", {
         parser.document.definitions.length.should.be(2);
       });
 
-      it("generated haxe contain the expected args type", {
-        haxe.should.contain('typedef Args_SomeType_friends');
+      // This GQL will not generate, as it references types that don't exist
+      it("should throw unknown type", {
+          var err:String = graphql.HaxeGenerator.parse.bind(parser.document).should.throwType(String);
+          err.should.contain("unknown type: Person");
       });
 
+     
     });
   }
 

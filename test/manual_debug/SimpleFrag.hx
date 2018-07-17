@@ -23,30 +23,50 @@ class Test
 
     var source = '
 
-type License {
-  license_id:ID!
+interface HasName {
+  name:String!
 }
 
-type Registration {
-  registration_id:ID!
+union Being = Person | Dog
+
+interface Job {
+  title:String!
 }
 
-union EitherLicenseOrRegistration = License | Registration
-
-interface HasUnionCovariableIdentity {
-  info: EitherLicenseOrRegistration
+type Plumber implements Job {
+  title:String!
+  plumber_id:ID!
+  favorite_wrench: String!
 }
 
-type NonCVPerson implements HasUnionCovariableIdentity {
+type Person implements HasName {
   person_id:ID!
   name:String!
-  info: EitherLicenseOrRegistration
+  job:Job
 }
 
-type CVPerson implements HasUnionCovariableIdentity {
-  person_id:ID!
+type Dog implements HasName {
+  dog_id:ID!
   name:String!
-  info: Registration
+}
+
+type Query {
+  by_name(name:String!): HasName
+}
+
+query ByName($$name:String!) {
+  by_name(name: $$name) {
+    name
+
+    ... on Person {
+      person_id
+    }
+ 
+    ... on Dog {
+      dog_id
+    }
+
+  }
 }
 
 ';

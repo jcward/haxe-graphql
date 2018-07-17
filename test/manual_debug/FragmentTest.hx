@@ -23,10 +23,6 @@ class Test
 
     var source = '
 
-schema {
-  query: MyQueries
-}
-
 interface HasName {
   name:String!
 }
@@ -40,6 +36,7 @@ interface Job {
 type Plumber implements Job {
   title:String!
   plumber_id:ID!
+  favorite_wrench: String!
 }
 
 type Person implements HasName {
@@ -53,34 +50,50 @@ type Dog implements HasName {
   name:String!
 }
 
+type Query {
+  by_name(name:String!): HasName
+}
+
 query ByName($$name:String!) {
   by_name(name: $$name) {
     name
 
-##    ... on Person {
-##
-##      ...PersonDetails
-## 
-##      job {
-##        title
-##        ... on Plumber {
-##          plumber_id
-##        }
-##      }
-##    }
-## 
-##    ... on Dog {
-##      dog_id
-##    }
+    # Simple DRY fragment on expected type (note: field is double specified)
+    ...JustName
+
+    # Inline Fragment on a ceratin implementor of this interface
+    ... on Person {
+      ...PersonDetails # named fragment on this expected type
+ 
+      job {
+        title
+        ... on Plumber {
+          plumber_id
+          ...PlumberDetails
+        }
+      }
+    }
+ 
+    ... on Dog {
+      dog_id
+    }
 
   }
 }
 
 
-## TODO: Named fragment (DRY)
-## fragment PersonDetails on Person {
-##   person_id
-## }
+fragment JustName on HasName {
+  name
+}
+
+fragment PersonDetails on Person {
+  person_id
+}
+
+fragment PlumberDetails on Plumber {
+  plumber_id
+  favorite_wrench
+}
 
 ';
 

@@ -93,9 +93,7 @@ mutation InsertFilm($$title:String!, $$director:String, $$releaseDate:Date, $$re
         }
 
         // result type:
-        result_type_of_insertFilm.should.contain('?insert_film:');
-        result_type_of_insertFilm.should.contain('id:ID');
-        result_type_of_insertFilm.should.not.contain('?id:ID');
+        result_type_of_insertFilm.should.contain('?insert_film : OP_InsertFilm_InnerResult');
       });
 
       var vars_type_of_insertFilm:String = "";
@@ -108,10 +106,10 @@ mutation InsertFilm($$title:String!, $$director:String, $$releaseDate:Date, $$re
         }
 
         // vars type:
-        vars_type_of_insertFilm.should.contain('title: String');
-        vars_type_of_insertFilm.should.contain('?director: String');
-        vars_type_of_insertFilm.should.contain('?releaseDate: Date');
-        vars_type_of_insertFilm.should.contain('?releaseStatus: ReleaseStatus');
+        vars_type_of_insertFilm.should.contain('title : String');
+        vars_type_of_insertFilm.should.contain('?director : String');
+        vars_type_of_insertFilm.should.contain('?releaseDate : Date');
+        vars_type_of_insertFilm.should.contain('?releaseStatus : ReleaseStatus');
       });
 
 
@@ -138,7 +136,7 @@ mutation InsertFilm($$title:String!, $$director:String, $$releaseDate:Date, $$re
         var p = new sys.io.Process("haxe", ["--cwd", "/tmp", "-x", "MutationGen"]);
         var stdout = p.stdout.readAll().toString();
         var stderr = p.stderr.readAll().toString();
-        stderr.should.contain('Warning : Null<{ id : ID }>');
+        stderr.should.contain('Warning : Null<OP_InsertFilm_InnerResult>');
         stdout.should.contain('and we executed');
       });
 
