@@ -23,30 +23,39 @@ class Test
 
     var source = '
 
-type License {
-  license_id:ID!
+# Creates typedefs for all schema types
+
+type FooContent {
+  foo_id:ID!
 }
 
-type Registration {
-  registration_id:ID!
+type BarContent {
+  bar_id:ID!
 }
 
-union EitherLicenseOrRegistration = License | Registration
+union ExtContentData = FooContent | BarContent
 
-interface HasUnionCovariableIdentity {
-  info: EitherLicenseOrRegistration
+type ContentData {
+  id:ID!
+  title:String!
+  description:String
+  ext_content_data: ExtContentData!
 }
 
-type NonCVPerson implements HasUnionCovariableIdentity {
-  person_id:ID!
-  name:String!
-  info: EitherLicenseOrRegistration
+type Query {
+  get_content_by_id: ContentData
 }
 
-type CVPerson implements HasUnionCovariableIdentity {
-  person_id:ID!
-  name:String!
-  info: Registration
+query GetContentsByID($$id: ID) {
+  get_content_by_id(id: $$id) {
+    title
+    description
+    ext_content_data {
+      ...on FooContent {
+        foo_id
+      }
+    }
+  }
 }
 
 ';

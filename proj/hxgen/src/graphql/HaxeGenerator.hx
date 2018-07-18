@@ -1,7 +1,6 @@
 package graphql;
 
 import graphql.ASTDefs;
-import haxe.ds.Either;
 
 import haxe.macro.Expr;
 
@@ -203,6 +202,11 @@ class HaxeGenerator
       stderr:_stderr_writer.toString(),
       stdout:print_to_stdout()
     };
+  }
+
+  private function ensure_unions_are_only_on_tobjects()
+  {
+    // TODO
   }
 
   private function ensure_interface_implementations()
@@ -607,12 +611,20 @@ class HaxeGenerator
       }
     }
 
-    // Warn on unselected obj_types, and unused field specifications
+    // Error on unselected obj_types, and unused field specifications
     for (obj_type in possible_object_types) {
-      if (!field_nodes_per_object_type.exists(obj_type)) {
-        error('Error: fragment or op ${ op_name } selected no fields for possible object type ${ obj_type }');
+
+      if (!field_nodes_per_object_type.exists(obj_type) || field_nodes_per_object_type[obj_type]==null) {
+        // Is this is allowed for unions -- to not specify any fields for one particular case?
+        if (is_union(base_type)) {
+          field_nodes_per_object_type[obj_type] = [];
+        } else {
+          error('Error: fragment or op ${ op_name } selected no fields for possible object type ${ obj_type }');
+        }
       }
     }
+
+    // Error on unused field pecifications
     for (cf in constrained_fields) {
       if (cf.usage==0) {
         error('Error: fragment or op ${ op_name } specified field ${ (cast cf.field_node).name.value } that didn\'t get used in possible types [${ possible_object_types.join(", ") }] via constraints [${ cf.constraints.join(", ") }]');
@@ -632,11 +644,14 @@ class HaxeGenerator
 
       var ignore_duplicates = [];
 
+      if (field_nodes_per_object_type[obj_type]==null && is_union(base_type)) continue;
+
       for (sel_node in field_nodes_per_object_type[obj_type]) {
         switch (sel_node.kind) { // Field | FragmentSpread | InlineFragment
         case Kind.FIELD:
           var field_node:FieldNode = cast sel_node;
-  
+          var has_sub_selections = field_node.selectionSet!=null && field_node.selectionSet.selections!=null && field_node.selectionSet.selections.length>0;
+
           var name:String = field_node.name.value;
           var alias:String = field_node.alias==null ? name : field_node.alias.value;
 
@@ -652,11 +667,18 @@ class HaxeGenerator
   
           switch type {
             case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
-              if (field_node.selectionSet!=null) throw 'Cannot specify sub-fields of ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
+              if (has_sub_selections) throw 'Cannot specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ op_name }';
               fields[alias] = resolved;
-            case TStruct(tname, tfields):
-              if (field_node.selectionSet==null) throw 'Must specify sub-fields of ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
-  
+            case TStruct(tname, _) | TUnion(tname, _):
+              if (!has_sub_selections) throw 'Must specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ op_name }';
+              if (is_union(tname)) {
+                if (field_node.selectionSet.selections.find(function(sn) return sn.kind==Kind.FIELD)!=null) {
+                  throw 'Can only specify fragment selections of union ${ tname } at ${ type_path.join(".") } of operation ${ op_name }';
+                }
+                // Should probably check this elsewhere...
+                // for (tv in values) if (!is_object_type(tv)) throw 'Union $tname must only consist of Object types per GraphQL spec.';
+              }
+
               var sub_type_name = (depth==0 && StringTools.endsWith(type_name, OP_OUTER_SUFFIX)) ?
                 StringTools.replace(type_name, OP_OUTER_SUFFIX, OP_INNER_SUFFIX) : type_name+DEFAULT_SEPARATOR+name;
   
@@ -672,9 +694,6 @@ class HaxeGenerator
                 _defined_types.remove(sub_type_name);
                 f.type = TAnon(sub_type);
               }
-            case TUnion(tname, _):
-              if (field_node.selectionSet!=null) throw 'Hmm, do we allow specifying sub-fields of union ${ tname } in ${ type_path.join(".") } of operation ${ op_name }';
-              fields[alias] = resolved;
           }
           case Kind.INLINE_FRAGMENT | Kind.FRAGMENT_SPREAD: throw 'Should not get fragment nodes here...';
           default: throw 'Unhandled sel_node kind ${ sel_node.kind }';

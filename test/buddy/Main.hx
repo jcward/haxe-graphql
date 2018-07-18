@@ -33,6 +33,7 @@ class Main {
                              // Github issue testcases
                              new tests.issues.Issue23(),
                              new tests.issues.Issue27(),
+                             new tests.issues.Issue30(),
     ], reporter);
 
     runner.run();
