@@ -1,0 +1,3 @@
+-cp ../../../coverme/src/
+-D COVERAGE
+go_buddy.hxml

@@ -24,6 +24,9 @@ typedef SchemaMap = {
 
 typedef SomeNamedNode = { kind:String, name:NameNode };
 
+#if COVERAGE
+@:build(coverme.Instrument.build())
+#end
 @:expose
 class HaxeGenerator
 {
@@ -35,7 +38,9 @@ class HaxeGenerator
   private static var UNION_SELECTION_SEPARATOR = '_ON_';
   private static var ARGS_PREFIX = 'Args_';
   private static var GENERATED_UNION_PREFIX = 'U_';
-  public static inline var DEFAULT_SEPARATOR = '__';
+
+  /* https://github.com/nadako/coverme/issues/1 - issues with inline */
+  public #if !COVERAGE inline #end static var DEFAULT_SEPARATOR = '__';
 
   private var _stderr_writer:StringWriter;
   private var _options:HxGenOptions;

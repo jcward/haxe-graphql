@@ -1,32 +1,51 @@
 import buddy.*;
-using buddy.Should;
 
-class Main implements Buddy<[
+import buddy.reporting.ConsoleColorReporter;
+
+class Main {
+  public static function main()
+  {
+
+    var reporter = new ConsoleColorReporter();
+
+    var runner = new buddy.SuitesRunner([
                              // Basic functional and smoke tests
-                             tests.basic.BasicTypes,
-                             tests.basic.BoolTest,
-                             tests.basic.ValidHaxe,
-                             tests.basic.Reporting,
-                             tests.basic.BasicSchema,
-                             tests.basic.CovarianceUnion,
-                             tests.basic.CovarianceInterface,
-                             tests.args.ArgsDefaultValues,
-                             tests.operations.BasicQuery,
-                             tests.operations.ArgsQuery,
-                             tests.operations.QueryTypeGeneration,
-                             tests.operations.MutationTypeGeneration,
-                             tests.operations.UnnamedQuery,
-                             tests.star_wars.StarWarsTest,
+                             new tests.basic.BasicTypes(),
+                             new tests.basic.BoolTest(),
+                             new tests.basic.ValidHaxe(),
+                             new tests.basic.Reporting(),
+                             new tests.basic.BasicSchema(),
+                             new tests.basic.CovarianceUnion(),
+                             new tests.basic.CovarianceInterface(),
+                             new tests.args.ArgsDefaultValues(),
+                             new tests.operations.BasicQuery(),
+                             new tests.operations.ArgsQuery(),
+                             new tests.operations.QueryTypeGeneration(),
+                             new tests.operations.MutationTypeGeneration(),
+                             new tests.operations.UnnamedQuery(),
+                             new tests.star_wars.StarWarsTest(),
 
-                             tests.fragments.FragmentTest,
-                             tests.fragments.Collapse,
-                             tests.fragments.Unreachable,
-                             tests.fragments.EmptyFragment,
+                             new tests.fragments.FragmentTest(),
+                             new tests.fragments.Collapse(),
+                             new tests.fragments.Unreachable(),
+                             new tests.fragments.EmptyFragment(),
 
                              // Github issue testcases
-                             tests.issues.Issue23,
-                             tests.issues.Issue27,
-]> {
+                             new tests.issues.Issue23(),
+                             new tests.issues.Issue27(),
+    ], reporter);
+
+    runner.run();
+
+#if COVERAGE
+    var coverage = coverme.Logger.instance.getCoverage();
+    HtmlReport.report(coverage, "coverage");
+#end
+
+    #if sys
+      Sys.exit(runner.statusCode());
+    #end
+  }
 
   public static function find_type_in_code(code:String, type:String):String
   {
