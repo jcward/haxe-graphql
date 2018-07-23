@@ -22,6 +22,7 @@ Development sponsored by: [www.wootmath.com](https://www.wootmath.com) [simbulus
 Release notes: 
 ---
 
+ 0.0.19 - Fixed fragment definition order should not matter / issue #31  
  0.0.18 - Implemented validation of directive parameters / issue #25  
  0.0.17 - Fixed cannot select from union types / issue #30  
  0.0.16 - Fixed inner array types / issue #27  
