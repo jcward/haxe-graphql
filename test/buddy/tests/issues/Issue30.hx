@@ -61,12 +61,10 @@ query GetContentsByID($$id: ID) {
       it("The HaxeGenerator should generate Haxe...", {
         var result = graphql.HaxeGenerator.parse(parser.document);
         haxe_code = result.stdout;
-        Main.print(haxe_code);
       });
 
       it("...and the OP_GetContentsByID_InnerResult__ext_content_data, should exist...", {
         var result = Main.find_type_in_code(haxe_code, 'abstract OP_GetContentsByID_InnerResult__ext_content_data(Dynamic) {');
-        Main.print(result, Main.Color.RED);
         result.split(':from').length.should.be(3);
       });
     });
