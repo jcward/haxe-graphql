@@ -51,7 +51,6 @@ class HaxeGenerator
   private var _referenced_types = [];
   private var _types_by_name = new StringMapAA<GQLTypeDefinition>();
   private var _interfaces_implemented = new StringMapAA<Array<String>>();
-  private var _named_fragment_concretes = new StringMapAA<String>();
 
   public static function parse(doc:DocumentNode,
                                ?options:HxGenOptions,
@@ -307,7 +306,6 @@ class HaxeGenerator
   {
     var on_type = def.typeCondition.name.value;
     var tname = '${ FRAGMENT_PREFIX }${ def.name.value }';
-    _named_fragment_concretes[tname] = on_type;
 
     // Fragments can have fragments... Do the order of these calls need to be determinant?
     generate_type_based_on_selection_set(tname,
@@ -453,7 +451,14 @@ class HaxeGenerator
     var info = null;
     if (sel_node.kind==Kind.FRAGMENT_SPREAD) {
       var name:String = FRAGMENT_PREFIX+(cast sel_node).name.value;
-      var concrete = _named_fragment_concretes[name];
+
+      var concrete = null;
+      for (frag in _fragment_defs) {
+        if (frag.name.value==(cast sel_node).name.value) {
+          concrete = frag.typeCondition.name.value;
+        }
+      }
+
       if (concrete==null) throw 'Error, did not find fragment spread named: ${ name }';
       info = {
         concrete:concrete,

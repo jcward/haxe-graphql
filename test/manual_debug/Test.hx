@@ -23,50 +23,29 @@ class Test
 
     var source = '
 
-# Creates typedefs for all schema types
-
-type FooContent {
-  foo_id:ID!
-}
-
-type BarContent {
-  bar_id:ID!
-}
-
-union SomeData = FooContent | BarContent
-
-type OuterData {
+type SomeData {
   id:ID!
-  title:String!
-  description:String
-  foo_or_bar_data: SomeData!
+  foo:String!
+  bar:String!
 }
 
 type Query {
-  get_content_by_id: OuterData
+  get_some_data: SomeData
 }
 
-fragment InnerFrag on OuterData {
-  foo_or_bar_data @include(if: $$with_data) {
-    ...on FooContent {
-      common_id: foo_id
-    }
-    ...on BarContent {
-      common_id: bar_id
-    }
-  }
+fragment OuterFrag on SomeData {
+  foo
+  ...InnerFrag
 }
 
-query GetContentsByID($$id: ID, $$with_data: Boolean=false) {
-  get_content_by_id(id: $$id) {
-    title
-    description
-    foo_or_bar_data @include(if: $$with_data) {
-      ...on FooContent {
-        foo_id
-      }
-    }
-    ...InnerFrag
+fragment InnerFrag on SomeData {
+  bar
+}
+
+query GetSomeData {
+  get_some_data {
+    id
+    ...OuterFrag
   }
 }
 
