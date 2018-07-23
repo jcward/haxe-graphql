@@ -33,28 +33,40 @@ type BarContent {
   bar_id:ID!
 }
 
-union ExtContentData = FooContent | BarContent
+union SomeData = FooContent | BarContent
 
-type ContentData {
+type OuterData {
   id:ID!
   title:String!
   description:String
-  ext_content_data: ExtContentData!
+  foo_or_bar_data: SomeData!
 }
 
 type Query {
-  get_content_by_id: ContentData
+  get_content_by_id: OuterData
 }
 
-query GetContentsByID($$id: ID) {
+fragment InnerFrag on OuterData {
+  foo_or_bar_data @include(if: $$with_data) {
+    ...on FooContent {
+      common_id: foo_id
+    }
+    ...on BarContent {
+      common_id: bar_id
+    }
+  }
+}
+
+query GetContentsByID($$id: ID, $$with_data: Boolean=false) {
   get_content_by_id(id: $$id) {
     title
     description
-    ext_content_data {
+    foo_or_bar_data @include(if: $$with_data) {
       ...on FooContent {
         foo_id
       }
     }
+    ...InnerFrag
   }
 }
 

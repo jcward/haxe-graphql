@@ -23,6 +23,7 @@ class Main {
                              new tests.operations.QueryTypeGeneration(),
                              new tests.operations.MutationTypeGeneration(),
                              new tests.operations.UnnamedQuery(),
+                             new tests.operations.VerifyDirectives(),
                              new tests.star_wars.StarWarsTest(),
 
                              new tests.fragments.FragmentTest(),

@@ -311,7 +311,7 @@ class HaxeGenerator
 
     // Fragments can have fragments... Do the order of these calls need to be determinant?
     generate_type_based_on_selection_set(tname,
-                                         tname,
+                                         { debug_name:tname, is_operation:false },
                                          def.selectionSet,
                                          on_type);
   }
@@ -416,11 +416,11 @@ class HaxeGenerator
     case TAnon(def): def;
   }
 
-  function resolve_field(path:Array<String>, ?op_name:String):GQLFieldType
+  function resolve_field(path:Array<String>, ?gt_info:GenTypeInfo):GQLFieldType
   {
     var ptr:GQLTypeDefinition = null;
 
-    var err_prefix = op_name!=null ? 'Error processing operation ${ op_name }: ' : "";
+    var err_prefix = gt_info!=null ? 'Error processing operation ${ gt_info.debug_name }: ' : "";
 
     var orig_path = path.join('.');
     while (path.length>0) {
@@ -579,12 +579,12 @@ class HaxeGenerator
   }
 
   function generate_type_based_on_selection_set(type_name:String,
-                                                op_name:String,
+                                                gt_info:GenTypeInfo,
                                                 sel_set:{ selections:Array<SelectionNode> },
                                                 base_type:String,
                                                 depth:Int=0):GQLTypeDefinition
   {
-    if (_basic_types.indexOf(base_type)>=0) throw 'Cannot create a fragment or operation ${ op_name } on a basic type, ${ base_type }';
+    if (_basic_types.indexOf(base_type)>=0) throw 'Cannot create a fragment or operation ${ gt_info.debug_name } on a basic type, ${ base_type }';
 
     var possible_object_types = get_possible_object_types_from(base_type);
 
@@ -619,15 +619,15 @@ class HaxeGenerator
         if (is_union(base_type)) {
           field_nodes_per_object_type[obj_type] = [];
         } else {
-          error('Error: fragment or op ${ op_name } selected no fields for possible object type ${ obj_type }');
+          error('Error: fragment or op ${ gt_info.debug_name } selected no fields for possible object type ${ obj_type }');
         }
       }
     }
 
-    // Error on unused field pecifications
+    // Error on unused field specifications
     for (cf in constrained_fields) {
       if (cf.usage==0) {
-        error('Error: fragment or op ${ op_name } specified field ${ (cast cf.field_node).name.value } that didn\'t get used in possible types [${ possible_object_types.join(", ") }] via constraints [${ cf.constraints.join(", ") }]');
+        error('Error: fragment or op ${ gt_info.debug_name } specified field ${ (cast cf.field_node).name.value } that didn\'t get used in possible types [${ possible_object_types.join(", ") }] via constraints [${ cf.constraints.join(", ") }]');
       }
     }
 
@@ -655,6 +655,8 @@ class HaxeGenerator
           var name:String = field_node.name.value;
           var alias:String = field_node.alias==null ? name : field_node.alias.value;
 
+          if (gt_info.is_operation) validate_directives(field_node, gt_info);
+
           // Ignore fields specified more than once (with the same alias)
           var dup_key = '$name -> $alias';
           if (ignore_duplicates.indexOf(dup_key)>=0) continue;
@@ -662,18 +664,18 @@ class HaxeGenerator
 
           var next_type_path = type_path.slice(0);
           next_type_path.push(name);
-          var resolved = resolve_field(next_type_path, op_name);
+          var resolved = resolve_field(next_type_path, gt_info);
           var type = resolve_type(resolved.type);
   
           switch type {
             case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
-              if (has_sub_selections) throw 'Cannot specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ op_name }';
+              if (has_sub_selections) throw 'Cannot specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }';
               fields[alias] = resolved;
             case TStruct(tname, _) | TUnion(tname, _):
-              if (!has_sub_selections) throw 'Must specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ op_name }';
+              if (!has_sub_selections) throw 'Must specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }';
               if (is_union(tname)) {
                 if (field_node.selectionSet.selections.find(function(sn) return sn.kind==Kind.FIELD)!=null) {
-                  throw 'Can only specify fragment selections of union ${ tname } at ${ type_path.join(".") } of operation ${ op_name }';
+                  throw 'Can only specify fragment selections of union ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }';
                 }
                 // Should probably check this elsewhere...
                 // for (tv in values) if (!is_object_type(tv)) throw 'Union $tname must only consist of Object types per GraphQL spec.';
@@ -682,7 +684,7 @@ class HaxeGenerator
               var sub_type_name = (depth==0 && StringTools.endsWith(type_name, OP_OUTER_SUFFIX)) ?
                 StringTools.replace(type_name, OP_OUTER_SUFFIX, OP_INNER_SUFFIX) : type_name+DEFAULT_SEPARATOR+name;
   
-              var sub_type = generate_type_based_on_selection_set(sub_type_name, op_name, field_node.selectionSet, tname, depth+1);
+              var sub_type = generate_type_based_on_selection_set(sub_type_name, gt_info, field_node.selectionSet, tname, depth+1);
               var f = { type:null, is_array:resolved.is_array, is_optional:resolved.is_optional };
               fields[alias] = f;
               if (is_union(sub_type_name)) {
@@ -710,6 +712,25 @@ class HaxeGenerator
     
   }
 
+  // Per the discussion at https://github.com/facebook/graphql/issues/204, the operation
+  // variables are global, and any variables used herein (both in fragments or regular fields)
+  // must be defined in the operation variables.
+  function validate_directives(field_node:FieldNode, gt_info:GenTypeInfo)
+  {
+    if (field_node.directives!=null) {
+      for (dir in field_node.directives) {
+        if (dir.arguments!=null) for (arg in dir.arguments) {
+          // here, arg.name.value is 'if', and arg.value.name.value is 'my_param'
+          var param = (cast arg.value).name.value;
+          //trace('Found param: ${ param }');
+          var valid = false;
+          for (vrr in gt_info.op_variables) if (vrr.variable.name.value==param) valid = true;
+          if (!valid) throw 'Error: operation ${ gt_info.debug_name } is expecting parameter ${ param } which hasn\'t been defined in the operation variables!';
+        }
+      }
+    }
+  }
+
   function write_operation_def_result(root_schema:SchemaMap,
                                       root:ASTDefs.DocumentNode,
                                       def:ASTDefs.OperationDefinitionNode):OpVariables
@@ -729,7 +750,7 @@ class HaxeGenerator
 
     // gen type based on selection set
     generate_type_based_on_selection_set('${ OP_PREFIX }${ op_name }${ OP_OUTER_SUFFIX }',
-                                         op_name,
+                                         { debug_name:op_name, is_operation:true, op_variables:def.variableDefinitions },
                                          def.selectionSet,
                                          op_root_type);
 
@@ -771,6 +792,11 @@ abstract ID(String) to String from String {\n  // Relaxed safety -- allow implic
   }
 }
 
+typedef GenTypeInfo = {
+  debug_name:String,
+  is_operation:Bool, // when false, it's a fragment
+  ?op_variables:Array<VariableDefinitionNode>
+}
 
 class StringWriter
 {
