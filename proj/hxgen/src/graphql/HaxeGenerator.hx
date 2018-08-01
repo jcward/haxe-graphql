@@ -34,7 +34,7 @@ class HaxeGenerator
   private static var OP_INNER_SUFFIX = '_InnerResult';
   private static var OP_VARS_SUFFIX = '_Vars';
   private static var FRAGMENT_PREFIX = 'Fragment_';
-  private static var UNION_SELECTION_SEPARATOR = '_ON_';
+  public #if !COVERAGE inline #end static var UNION_SELECTION_SEPARATOR = '_ON_';
   private static var ARGS_PREFIX = 'Args_';
   private static var GENERATED_UNION_PREFIX = 'U_';
 
@@ -898,7 +898,13 @@ class GQLTypeTools
         writer.append('/* union '+tname+' = ${ union_types_note } */');
         writer.append('abstract '+tname+'(Dynamic) {');
         for (type_name in type_paths) {
-          writer.append(' @:from static function from${ type_name }(v:${ type_name }) return cast v;');
+          writer.append(' @:from static function from${ type_name }(v:${ type_name }):${ tname } return cast v;');
+          var as_name = type_name;
+          var sep:String = HaxeGenerator.UNION_SELECTION_SEPARATOR;
+          if (as_name.indexOf(sep)>=0) {
+            as_name = as_name.substr(as_name.indexOf(sep)+sep.length);
+          }
+          writer.append(' public function as${ HaxeGenerator.DEFAULT_SEPARATOR }${ as_name }():${ type_name } return cast this;');
         }
         writer.append('}');
         return writer.toString();

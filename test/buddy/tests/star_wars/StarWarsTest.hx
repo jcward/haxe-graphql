@@ -42,9 +42,16 @@ class StarWarsTest extends BuddySuite
         var exec_code = '
         class StarWars {
           public static function main() {
-            var luke = { "name":"Luke", id:"abc123", friends:[], appearsIn:[  NEWHOPE, EMPIRE, JEDI ] };
+            var fakeFriendsConnection:Dynamic = {};
+            var luke:Human = { "name":"Luke", height:2.1, friendsConnection:fakeFriendsConnection, id:"abc123", friends:[], appearsIn:[  NEWHOPE, EMPIRE, JEDI ] };
+            $$type(luke);
+
             trace(\'Use the force, $${ luke }\');
             trace(\'And $${ luke.name } appears in $${ luke.appearsIn.length } episodes (known by the current schema)\');
+
+
+            var result:SearchResult = luke; // auto @:from
+            $$type(result.as__Droid()); // test as_* functions
           }
         }
 
@@ -60,8 +67,12 @@ class StarWarsTest extends BuddySuite
       });
 
       it("...and the code, if it's valid, will be executed by the Haxe compiler!", function() {
-        var output = new sys.io.Process("haxe", ["--cwd", "/tmp", "-x", "StarWars"]).stdout.readAll().toString();
-        output.should.contain('Luke appears in 3 episodes');
+        var p = new sys.io.Process("haxe", ["--cwd", "/tmp", "-x", "StarWars"]);
+        var stdout = p.stdout.readAll().toString();
+        stdout.should.contain('Luke appears in 3 episodes');
+        var stderr = p.stderr.readAll().toString();
+        stderr.should.contain(':6: characters 18-22 : Warning : Human');
+        stderr.should.contain(':13: characters 18-36 : Warning : Droid');
       });
 
     });
