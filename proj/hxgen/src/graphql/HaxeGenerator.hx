@@ -898,13 +898,13 @@ class GQLTypeTools
         writer.append('/* union '+tname+' = ${ union_types_note } */');
         writer.append('abstract '+tname+'(Dynamic) {');
         for (type_name in type_paths) {
-          writer.append(' @:from static function from${ type_name }(v:${ type_name }):${ tname } return cast v;');
+          writer.append(' @:from static inline function from${ type_name }(v:${ type_name }):${ tname } return cast v;');
           var as_name = type_name;
           var sep:String = HaxeGenerator.UNION_SELECTION_SEPARATOR;
           if (as_name.indexOf(sep)>=0) {
             as_name = as_name.substr(as_name.indexOf(sep)+sep.length);
           }
-          writer.append(' public function as${ HaxeGenerator.DEFAULT_SEPARATOR }${ as_name }():${ type_name } return cast this;');
+          writer.append(' public inline function as${ HaxeGenerator.DEFAULT_SEPARATOR }${ as_name }():${ type_name } return cast this;');
         }
         writer.append('}');
         return writer.toString();
