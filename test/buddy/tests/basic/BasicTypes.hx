@@ -32,7 +32,6 @@ type Dog implements INamed {
   id:    ID!
   name : String!
 }
-
 ';
 
   public function new() {

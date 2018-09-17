@@ -127,12 +127,14 @@ class HaxeGenerator
 
     var root_schema:SchemaMap = null;
 
-    // First pass: parse the schema def only
+    // First pass: parse the schema def and gather type extensions
     for (def in doc.definitions) {
       switch (def.kind) {
         case ASTDefs.Kind.SCHEMA_DEFINITION:
           if (root_schema!=null) error('Error: cannot specify two schema definitions');
           root_schema = ingest_schema_def(cast def);
+        case ASTDefs.Kind.OBJECT_TYPE_EXTENSION:
+          apply_type_extension(cast def, doc.definitions);
         case _:
       }
     }
@@ -165,6 +167,8 @@ class HaxeGenerator
       case ASTDefs.Kind.FRAGMENT_DEFINITION:
         // No-op, still generating type definitions
         _fragment_defs.push(cast def);
+      case ASTDefs.Kind.OBJECT_TYPE_EXTENSION:
+        // Handled above
       default:
         var name = (cast def).name!=null ? (' - '+(cast def).name.value) : '';
         error('Error: unknown / unsupported definition kind: '+def.kind+name);
@@ -203,9 +207,45 @@ class HaxeGenerator
     };
   }
 
-  private function ensure_unions_are_only_on_tobjects()
+  private function get_node_named(find_name:String,
+                                  nodes:Array<SomeNamedNode>,
+                                  ignore:Dynamic->Bool=null):Dynamic
   {
-    // TODO
+    if (nodes==null || nodes.length==0) return null;
+    for (node in nodes) {
+      if (node.name.value==find_name) {
+        if (ignore!=null && !ignore(node)) return node;
+      }
+    }
+    return null;
+  }
+
+  private function apply_type_extension(ext:ObjectTypeDefinitionNode,
+                                        definitions:Array<DefinitionNode>)
+  {
+    // Do not modify the definitions array itself, but you can modify the items in it
+
+    var base:Dynamic = get_node_named(ext.name.value, cast definitions, function(node) {
+      return node!=null && node.kind==ASTDefs.Kind.OBJECT_TYPE_EXTENSION;
+    });
+    if (base==null) throw 'Type extension for ${ ext.name.value } didn\'t find base type!';
+
+    // Push extensions into root type
+    for (items_name in ['fields', 'directives', 'interfaces']) {
+      var ext_items:Array<SomeNamedNode> = Reflect.field(ext, items_name);
+      if (ext_items!=null && ext_items.length>0) {
+        var base_items = Reflect.field(base, items_name);
+        if (base_items==null) {
+          base_items = [];
+          Reflect.setField(base, items_name, base_items);
+        }
+        for (val in ext_items) {
+          var existing = get_node_named(val.name.value, base_items);
+          if (existing!=null) throw 'Type extension for ${ ext.name.value } cannot redefine ${ items_name }.${ val.name.value }';
+          base_items.push(val);
+        }
+      }
+    }
   }
 
   private function ensure_interface_implementations()
@@ -341,6 +381,7 @@ class HaxeGenerator
     for (field in def.fields) {
       var type = parse_field_type(field.type);
       var field_name = field.name.value;
+      if (fields[field_name]!=null) throw 'Error, type ${ def.name.value } defines field ${ field_name } more than once!';
       fields[field_name] = type; //.clone().follow();
 
       if (field.arguments!=null && field.arguments.length>0) {

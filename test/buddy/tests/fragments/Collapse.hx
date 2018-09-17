@@ -94,7 +94,7 @@ fragment HumanImportantDetails on Human {
         haxe_code = result.stdout;
       });
 
-      trace(haxe_code);
+      // trace(haxe_code);
 
       it("...and the code should contain the and inner result...", {
         haxe_code.should.contain("typedef OP_HumanById_InnerResult");

@@ -11,6 +11,7 @@ class Main {
     var runner = new buddy.SuitesRunner([
                              // Basic functional and smoke tests
                              new tests.basic.BasicTypes(),
+                             new tests.basic.BasicErrors(),
                              new tests.basic.BoolTest(),
                              new tests.basic.ValidHaxe(),
                              new tests.basic.Reporting(),
@@ -30,6 +31,9 @@ class Main {
                              new tests.fragments.Collapse(),
                              new tests.fragments.Unreachable(),
                              new tests.fragments.EmptyFragment(),
+
+                             new tests.extend.TypeExtend(),
+                             new tests.extend.TypeExtendErrors(),
 
                              // Github issue testcases
                              new tests.issues.Issue23(),

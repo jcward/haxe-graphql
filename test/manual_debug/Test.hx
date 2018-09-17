@@ -23,31 +23,44 @@ class Test
 
     var source = '
 
+
+extend type SomeData {
+  bar: Int!
+}
+
+extend type Query {
+  get_some_data_with_bar: SomeData
+}
+
+query GetSomeDataWithBar {
+  get_some_data_with_bar {
+    id
+    foo
+    bar
+  }
+}
+
+
+
 type SomeData {
   id:ID!
   foo:String!
-  bar:String!
 }
 
 type Query {
   get_some_data: SomeData
 }
 
-fragment OuterFrag on SomeData {
-  foo
-  ...InnerFrag
-}
-
-fragment InnerFrag on SomeData {
-  bar
-}
-
 query GetSomeData {
   get_some_data {
     id
-    ...OuterFrag
+    foo
   }
 }
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Assume another file has been concatenated and extends SomeData
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 ';
 
