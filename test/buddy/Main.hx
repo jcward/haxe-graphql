@@ -40,6 +40,7 @@ class Main {
                              new tests.issues.Issue27(),
                              new tests.issues.Issue30(),
                              new tests.issues.Issue31(),
+                             new tests.issues.Issue35(),
     ], reporter);
 
     runner.run();

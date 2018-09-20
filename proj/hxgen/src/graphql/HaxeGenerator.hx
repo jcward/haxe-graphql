@@ -63,7 +63,20 @@ class HaxeGenerator
     if (!gen._stderr_writer.is_empty()) {
       result.stderr = gen._stderr_writer.toString();
     } else {
-      result = gen.parse_document(doc);
+      // Don't let this crash, catch errors, and write log
+      try {
+        result = gen.parse_document(doc);
+      } catch (e:Dynamic) {
+        // e can be ignored for end users -- determined errors are logged to stderr,
+        // and unexpected errors (e.g. null object reference) are not helpful to end users.
+        var known_errors:String = gen.get_stderr();
+        // if there are no known errors, output the exception.
+        if (known_errors.length==0) known_errors = '${ e }';
+        result = {
+          stdout:'',
+          stderr:known_errors+'\nHaxeGenerator failed!'
+        }
+      }
     }
 
     if (throw_on_error && result.stderr.length>0) {
@@ -72,6 +85,8 @@ class HaxeGenerator
 
     return result;
   }
+
+  public function get_stderr():String return _stderr_writer.toString();
 
   // Private constructor simply because, once parsed, the generator's state
   // is "dirty", it should be considered "consumed". So use a static
@@ -175,6 +190,13 @@ class HaxeGenerator
       }
     }
 
+    // Ensure all referenced types are defined
+    for (t in _referenced_types) {
+      if (_defined_types.indexOf(t)<0) {
+        error('Error: unknown type: '+t);
+      }
+    }
+
     // Third pass: generate fragment definitions
     for (def in doc.definitions) switch def.kind {
       case ASTDefs.Kind.FRAGMENT_DEFINITION:
@@ -188,13 +210,6 @@ class HaxeGenerator
         var vars = write_operation_def_result(root_schema, doc, cast def);
         handle_variables(vars);
       default:
-    }
-
-    // Ensure all referenced types are defined
-    for (t in _referenced_types) {
-      if (_defined_types.indexOf(t)<0) {
-        error('Error: unknown type: '+t);
-      }
     }
 
     // Ensure all interface implementations are valid, including
@@ -228,7 +243,10 @@ class HaxeGenerator
     var base:Dynamic = get_node_named(ext.name.value, cast definitions, function(node) {
       return node!=null && node.kind==ASTDefs.Kind.OBJECT_TYPE_EXTENSION;
     });
-    if (base==null) throw 'Type extension for ${ ext.name.value } didn\'t find base type!';
+    if (base==null) {
+      error('Type extension for ${ ext.name.value } didn\'t find base type!');
+      return;
+    }
 
     // Push extensions into root type
     for (items_name in ['fields', 'directives', 'interfaces']) {
@@ -241,8 +259,11 @@ class HaxeGenerator
         }
         for (val in ext_items) {
           var existing = get_node_named(val.name.value, base_items);
-          if (existing!=null) throw 'Type extension for ${ ext.name.value } cannot redefine ${ items_name }.${ val.name.value }';
-          base_items.push(val);
+          if (existing!=null) {
+            error('Type extension for ${ ext.name.value } cannot redefine ${ items_name }.${ val.name.value }');
+          } else {
+            base_items.push(val);
+          }
         }
       }
     }
@@ -256,18 +277,27 @@ class HaxeGenerator
           //trace('$tname implements $iname');
           var tfields = switch _types_by_name[tname] {
             case TStruct(name, fields): fields;
-            default: throw 'Object type $tname expected to have fields!';
+            default: error('Object type $tname expected to have fields!', true); null;
           }
           var ifields = switch _types_by_name[iname] {
             case TStruct(name, fields): fields;
-            default: throw 'Interface $iname expected to have fields!';
+            default: error('Interface $iname expected to have fields!', true); null;
           }
           for (field_name in ifields.keys()) {
             var ifield = ifields[field_name];
             var tfield = tfields[field_name];
-            if (tfield==null) throw 'Type $tname implements $iname, but doesn\'t provide field $field_name';
-            if (ifield.is_array != tfield.is_array) throw 'Type $tname implements $iname, but the type of field $field_name doesn\'t match (List vs non-List)';
-            if (ifield.is_optional != tfield.is_optional) throw 'Type $tname implements $iname, but the type of field $field_name doesn\'t match (nullable vs non-nullable)';
+            if (tfield==null) {
+              error('Type $tname implements $iname, but doesn\'t provide field $field_name');
+              continue;
+            }
+            if (ifield.is_array != tfield.is_array) {
+              error('Type $tname implements $iname, but the type of field $field_name doesn\'t match (List vs non-List)');
+              continue;
+            }
+            if (ifield.is_optional != tfield.is_optional) {
+              error('Type $tname implements $iname, but the type of field $field_name doesn\'t match (nullable vs non-nullable)');
+              continue;
+            }
 
             // These should be non-user-facing errors:
             var ifield_type_name = switch (ifield.type) { case TPath(n): n; default: throw 'Interfaces can only specify TPaths'; }
@@ -281,7 +311,7 @@ class HaxeGenerator
               var err = 'Covariance failed on $tname field [$field_name:$tfield_type_name] for interface $iname [$field_name:$ifield_type_name]';
 
               if ( !is_object_type(tfield_type_name) ) {
-                throw err;
+                error(err);
               } else {
                 if (is_interface(ifield_type_name) && implements_interface(tfield_type_name, ifield_type_name)) {
                   // covariance ok
@@ -290,7 +320,7 @@ class HaxeGenerator
                   // covariance ok
                   // trace('COVAIRANCE OK! $tfield_type_name is a member of $ifield_type_name');
                 } else {
-                  throw err;
+                  error(err);
                 }
               }
             }
@@ -302,7 +332,10 @@ class HaxeGenerator
 
   private function get_def_name(def) return def.name.value;
 
-  private function error(s:String) _stderr_writer.append(s);
+  private function error(s:String, and_throw=false) {
+    _stderr_writer.append(s);
+    if (and_throw) throw s;
+  }
 
   function type_referenced(name) {
     if (_referenced_types.indexOf(name)<0) _referenced_types.push(name);
@@ -316,11 +349,11 @@ class HaxeGenerator
       _defined_types.push(name);
       _types_by_name[name] = t;
     } else {
-      throw 'Cannot define type $name twice!';
+      error('Cannot define type $name twice!');
     }
   }
 
-  function parse_field_type(type:ASTDefs.TypeNode, parent:ASTDefs.TypeNode=null):GQLFieldType
+  function parse_field_type(type:ASTDefs.TypeNode, def_name:String):GQLFieldType
   {
     var field_type:GQLFieldType = { type:null, is_array:false, is_optional:false };
 
@@ -338,7 +371,7 @@ class HaxeGenerator
     field_type.is_optional = type.kind!=ASTDefs.Kind.NON_NULL_TYPE;
     has_kind(' find base ', type);
 
-    if (field_type.type==null) throw 'Did not find the base type!';
+    if (field_type.type==null) error('Malformed GQL definition - did not find the named type while parsing definition: ${ def_name }!');
     return field_type;
   }
 
@@ -379,9 +412,9 @@ class HaxeGenerator
     define_type(TStruct(def.name.value, fields));
 
     for (field in def.fields) {
-      var type = parse_field_type(field.type);
+      var type = parse_field_type(field.type, def.name.value);
       var field_name = field.name.value;
-      if (fields[field_name]!=null) throw 'Error, type ${ def.name.value } defines field ${ field_name } more than once!';
+      if (fields[field_name]!=null) error('Error, type ${ def.name.value } defines field ${ field_name } more than once!');
       fields[field_name] = type; //.clone().follow();
 
       if (field.arguments!=null && field.arguments.length>0) {
@@ -410,8 +443,11 @@ class HaxeGenerator
   function ingest_union_type_def(def:ASTDefs.UnionTypeDefinitionNode) {
     var values = [];
     for (type in def.types) {
-      if (type.name==null) throw 'Expecting Named Type';
-      values.push(type.name.value);
+      if (type.name==null) {
+        error('Expecting Named Types in Union ${ def.name.value }');
+      } else {
+        values.push(type.name.value);
+      }
     }
     generate_union_of_types(values, def.name.value);
   }
@@ -422,7 +458,7 @@ class HaxeGenerator
     if (tname==null) {
       values.sort(function(a,b) return a>b ? 1 : -1);
       tname = GENERATED_UNION_PREFIX+values.join(DEFAULT_SEPARATOR);
-      if (_defined_types.indexOf(tname)>=0) throw 'Cannot redefine union $tname';
+      if (_defined_types.indexOf(tname)>=0) error('Cannot redefine union $tname');
     }
     _map_of_union_types[tname] = values;
     define_type(TUnion(tname, values));
@@ -443,15 +479,18 @@ class HaxeGenerator
         //_stdout_writer.append('typedef Schema${ capitalized }Type = ${ ot.type.name.value };');
         if (op=="query") rtn.query_type = ot.type.name.value;
         if (op=="mutation") rtn.mutation_type = ot.type.name.value;
-        default: throw 'Unexpected schema operation: ${ op }';
+        default: error('Unexpected schema operation: ${ op }');
       }
     }
 
     return rtn;
   }
 
-  function resolve_type(t:GQLTypeRef):GQLTypeDefinition return switch (t) {
-    case TPath(name):_types_by_name.get(name);
+  function resolve_type(t:GQLTypeRef, err_prefix:String=""):GQLTypeDefinition return switch (t) {
+    case TPath(name):
+      var rtn = _types_by_name.get(name);
+      if (rtn==null) error('${ err_prefix }Error: type not found: ${ name }', true);
+      rtn;
     case TAnon(def): def;
   }
 
@@ -466,25 +505,29 @@ class HaxeGenerator
       var name = path.shift();
       if (ptr==null) { // select from root types
         ptr = _types_by_name.get(name);
-        if (ptr==null) throw '${ err_prefix }Didn\'t find root type ${ name } while resolving ${ orig_path }';
+        if (ptr==null) error('${ err_prefix }Didn\'t find root type ${ name } while resolving ${ orig_path }', true);
         if (path.length==0) return { is_array:false, is_optional:false, type:TPath(name) };
       } else {
         switch ptr {
           case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
-            throw '${ err_prefix }Expecting type ${ tname } to have field ${ name }!';
+            error('${ err_prefix }Expecting type ${ tname } to have field ${ name }!', true);
           case TStruct(tname, fields):
             var field = fields[name];
-            if (field==null) throw '${ err_prefix }Expecting type ${ tname } to have field ${ name }!';
-            if (path.length==0) return field;
-            ptr = resolve_type(field.type);
-            if (ptr==null) throw '${ err_prefix }Did not find type ${ field.type } referenced by ${ tname }.${ name }!';
+            if (field==null) error('${ err_prefix }Expecting type ${ tname } to have field ${ name }!', true);
+            if (path.length==0) {
+              resolve_type(field.type, err_prefix);
+              return field;
+            }
+            ptr = resolve_type(field.type, err_prefix);
+            if (ptr==null) error('${ err_prefix }Did not find type ${ field.type } referenced by ${ tname }.${ name }!', true);
           case TUnion(tname, _):
-            throw 'TODO: deterimne if graphql lets you poke down into common fields of unions...';
+            error('TODO: deterimne if graphql lets you poke down into common fields of unions...', true);
         }
       }
     }
 
-    throw '${ err_prefix }couldn\'t resolve path: ${ orig_path }';
+    error('${ err_prefix }couldn\'t resolve path: ${ orig_path }', true);
+    return null;
   }
 
   function get_fragment_info(sel_node:SelectionNode)
@@ -500,7 +543,8 @@ class HaxeGenerator
         }
       }
 
-      if (concrete==null) throw 'Error, did not find fragment spread named: ${ name }';
+      if (concrete==null) error('Error, did not find fragment spread named: ${ name }', true);
+
       info = {
         concrete:concrete,
         selectionSet:_fragment_defs.find(function(def) {
@@ -514,7 +558,8 @@ class HaxeGenerator
       return info;
     }
 
-    throw 'Error determining fragment info for fragment node: ${ sel_node }';
+    error('Error determining fragment info for fragment node: ${ sel_node }', true);
+    return null;
   }
 
   // Fragments / unification:
@@ -561,7 +606,7 @@ class HaxeGenerator
     // Umm, sure you can fragment on the current type
     if (obj_type==constraint_type) return true;
 
-    if (!is_object_type(obj_type)) throw 'Check_constraint is only valid on Object types, not ${ obj_type }';
+    if (!is_object_type(obj_type)) error('Check_constraint is only valid on Object types, not ${ obj_type }');
 
     // If constraint_type is an interface, obj_type must implement it to satisfy constraint:
     if (is_interface(constraint_type)) {
@@ -604,7 +649,7 @@ class HaxeGenerator
         if (ifs.indexOf(base_type)>=0) rtn.push(t);
       }
       if (rtn.length==0) {
-        throw 'Query or fragment on interface ${ base_type }, did not find any Object types that implement it!';
+        error('Query or fragment on interface ${ base_type }, did not find any Object types that implement it!');
       }
       return rtn;
     }
@@ -612,15 +657,20 @@ class HaxeGenerator
     if (is_union(base_type)) { // return all member object types of union base_type
       var rtn = [];
       for (member in _map_of_union_types[base_type]) {
-        if (!is_object_type(member)) 'Union ${ base_type } may not contain any type (${ member }) other than object types, per GraphQL spec';
-        rtn.push(member);
+        if (!is_object_type(member)) {
+          error('Union ${ base_type } may not contain any type (${ member }) other than object types, per GraphQL spec');
+        } else {
+          rtn.push(member);
+        }
       }
       return rtn;
     }
 
     switch (_types_by_name[base_type]) {
       case TStruct(_): return [base_type];
-      default: throw 'Cannot create fragment or operation on non-Object type ${ base_type }';
+      default:
+        error('Cannot create fragment or operation on non-Object type ${ base_type }', true);
+        return null;
     }
   }
 
@@ -630,7 +680,9 @@ class HaxeGenerator
                                                 base_type:String,
                                                 depth:Int=0):GQLTypeDefinition
   {
-    if (_basic_types.indexOf(base_type)>=0) throw 'Cannot create a fragment or operation ${ gt_info.debug_name } on a basic type, ${ base_type }';
+    if (_basic_types.indexOf(base_type)>=0) {
+      error('Cannot create a fragment or operation ${ gt_info.debug_name } on a basic type, ${ base_type }', true);
+    }
 
     var possible_object_types = get_possible_object_types_from(base_type);
 
@@ -715,16 +767,18 @@ class HaxeGenerator
   
           switch type {
             case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
-              if (has_sub_selections) throw 'Cannot specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }';
+              if (has_sub_selections) {
+                error('Cannot specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }', true);
+              }
               fields[alias] = resolved;
             case TStruct(tname, _) | TUnion(tname, _):
-              if (!has_sub_selections) throw 'Must specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }';
+              if (!has_sub_selections) {
+                error('Must specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }', true);
+              }
               if (is_union(tname)) {
                 if (field_node.selectionSet.selections.find(function(sn) return sn.kind==Kind.FIELD)!=null) {
-                  throw 'Can only specify fragment selections of union ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }';
+                  error('Can only specify fragment selections of union ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }', true);
                 }
-                // Should probably check this elsewhere...
-                // for (tv in values) if (!is_object_type(tv)) throw 'Union $tname must only consist of Object types per GraphQL spec.';
               }
 
               var sub_type_name = (depth==0 && StringTools.endsWith(type_name, OP_OUTER_SUFFIX)) ?
@@ -743,8 +797,8 @@ class HaxeGenerator
                 f.type = TAnon(sub_type);
               }
           }
-          case Kind.INLINE_FRAGMENT | Kind.FRAGMENT_SPREAD: throw 'Should not get fragment nodes here...';
-          default: throw 'Unhandled sel_node kind ${ sel_node.kind }';
+          case Kind.INLINE_FRAGMENT | Kind.FRAGMENT_SPREAD: error('Should not get fragment nodes here...', true);
+          default: error('Unhandled sel_node kind ${ sel_node.kind }', true);
         }
       }
     }
@@ -771,7 +825,7 @@ class HaxeGenerator
           //trace('Found param: ${ param }');
           var valid = false;
           for (vrr in gt_info.op_variables) if (vrr.variable.name.value==param) valid = true;
-          if (!valid) throw 'Error: operation ${ gt_info.debug_name } is expecting parameter ${ param } which hasn\'t been defined in the operation variables!';
+          if (!valid) error('Error: operation ${ gt_info.debug_name } is expecting parameter ${ param } which hasn\'t been defined in the operation variables!');
         }
       }
     }
@@ -781,7 +835,9 @@ class HaxeGenerator
                                       root:ASTDefs.DocumentNode,
                                       def:ASTDefs.OperationDefinitionNode):OpVariables
   {
-    if (def.name==null || def.name.value==null) throw 'Only named operations are supported...';
+    if (def.name==null || def.name.value==null) {
+      error('Unnamed / anonymous operations are not supported...', true);
+    }
 
     var op_name = def.name.value;
 
@@ -791,7 +847,7 @@ class HaxeGenerator
     } else if (def.operation=='mutation') {
       op_root_type = (root_schema==null || root_schema.mutation_type==null) ? 'Mutation' : root_schema.mutation_type;
     } else {
-      throw 'Error processing ${ op_name }: Only query and mutation are supported.';
+      error('Error processing ${ op_name }: Only query and mutation are supported.', true);
     }
 
     // gen type based on selection set

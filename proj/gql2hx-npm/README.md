@@ -22,6 +22,7 @@ Development sponsored by: [www.wootmath.com](https://www.wootmath.com) [simbulus
 Release notes: 
 ---
 
+ 0.0.22 - Improved error reporting / issue #35  
  0.0.21 - Added support for graphql 'extend type' / issue #33  
  0.0.20 - Added union .as__T cast helper functions  
  0.0.19 - Fixed fragment definition order should not matter / issue #31  

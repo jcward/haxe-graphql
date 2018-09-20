@@ -21,51 +21,9 @@ class Test
     trace('============================================================');
     trace('============================================================');
 
-    var source = '
-
-
-extend type SomeData {
-  bar: Int!
-}
-
-extend type Query {
-  get_some_data_with_bar: SomeData
-}
-
-query GetSomeDataWithBar {
-  get_some_data_with_bar {
-    id
-    foo
-    bar
-  }
-}
-
-
-
-type SomeData {
-  id:ID!
-  foo:String!
-}
-
-type Query {
-  get_some_data: SomeData
-}
-
-query GetSomeData {
-  get_some_data {
-    id
-    foo
-  }
-}
-
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Assume another file has been concatenated and extends SomeData
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-';
-
-    var p = new graphql.parser.Parser(source, { noLocation:true });
-    trace(source);
+    var gql = haxe.Resource.getString('injected_gql');
+    var p = new graphql.parser.Parser(gql, { noLocation:true });
+    trace(gql);
     trace(p.document);
 
     trace('============================================================');
