@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-VERSION_TAG = "v0.13.2"
+VERSION_TAG = "v14.3.0"
 url = "https://raw.githubusercontent.com/graphql/graphql-js/#{ VERSION_TAG }/src/language/ast.js"
 
 # Local for development...

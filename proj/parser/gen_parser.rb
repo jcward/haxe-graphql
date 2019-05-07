@@ -2,7 +2,7 @@
 
 require_relative './gen_shared'
 
-VERSION_TAG = "v0.13.2"
+VERSION_TAG = "v14.3.0"
 url = "https://raw.githubusercontent.com/graphql/graphql-js/#{ VERSION_TAG }/src/language/parser.js"
 javascript = `curl --silent '#{ url }'`
 

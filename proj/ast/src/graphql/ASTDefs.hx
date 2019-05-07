@@ -22,6 +22,8 @@ typedef TypeNode = { > BaseNode,
   // Calling these optionals makes us able to simply null-check them:
   ?name: NameNode, // Only for NamedTypeNode
   ?type: TypeNode, // Not for NamedTypeNode
+  ?operationTypes: Array<OperationTypeDefinitionNode>,
+  ?directives: Array<DirectiveNode>,
 }
 
 // typedef NamedOrListTypeNode = BaseNode; //  NamedTypeNode | ListTypeNode
@@ -92,6 +94,7 @@ typedef TypeNode = { > BaseNode,
   
   // Type System Definitions
   var SCHEMA_DEFINITION = 'SchemaDefinition';
+  var SCHEMA_EXTENSION = 'SchemaExtension';
   var OPERATION_TYPE_DEFINITION = 'OperationTypeDefinition';
   
   // Type Definitions
@@ -118,6 +121,7 @@ typedef TypeNode = { > BaseNode,
 }
 
 class ASTDefs { }
+
 
 /**
  * Copyright (c) 2015-present, Facebook, Inc.
@@ -349,6 +353,7 @@ typedef /* export type */ VariableDefinitionNode = {
   variable: VariableNode,
   type: TypeNode,
   ?defaultValue /* opt */ : ValueNode,
+  ?directives /* opt */ : /* $ReadOnlyArray */Array<DirectiveNode>,
 };
 
 typedef /* export type */ VariableNode = {
@@ -624,6 +629,16 @@ typedef /* export type */ InputObjectTypeDefinitionNode = {
   ?fields /* opt */ : /* $ReadOnlyArray */Array<InputValueDefinitionNode>,
 };
 
+// Type System Extensions
+typedef TypeSystemExtensionNode = BaseNode;
+
+typedef SchemaExtensionNode = {
+  kind:String, //'SchemaExtension',
+  ?loc: Location,
+  ?directives: Array<DirectiveNode>,
+  ?operationTypes: Array<OperationTypeDefinitionNode>,
+};
+
 // Type Extensions
 
 typedef /* export type */ TypeExtensionNode = BaseNode; /* 
@@ -692,5 +707,3 @@ typedef /* export type */ DirectiveDefinitionNode = {
   ?arguments /* opt */ : /* $ReadOnlyArray */Array<InputValueDefinitionNode>,
   locations: /* $ReadOnlyArray */Array<NameNode>,
 };
-
-

@@ -1,8 +1,8 @@
 package;
 
 import js.html.*;
-import js.Browser.*;
-import js.jquery.Helper.J as JQ;
+// import js.Browser.*;
+// import js.jquery.Helper.J as JQ;
 
 @:expose
 class Demo

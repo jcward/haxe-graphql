@@ -75,6 +75,7 @@ class CustomPrinter {
 		case OpMod: "%";
 		case OpInterval: "...";
 		case OpArrow: "=>";
+		case OpIn: "in";
 		case OpAssignOp(op):
 			printBinop(op)
 			+ "=";
@@ -125,6 +126,7 @@ class CustomPrinter {
 		case TParent(ct): "(" + printComplexType(ct) + ")";
 		case TOptional(ct): "?" + printComplexType(ct);
 		case TExtend(tpl, fields): '{> ${tpl.map(printTypePath).join(" >, ")}, ${fields.map(printField).join(", ")} }';
+		case _: "";
 	}
 
 	public function printMetadata(meta:MetadataEntry) return
@@ -139,6 +141,8 @@ class CustomPrinter {
 		case AInline: "inline";
 		case ADynamic: "dynamic";
 		case AMacro: "macro";
+		case AExtern: "extern";
+		case AFinal: "final";
 	}
 
 	public function printField(field:Field) {
@@ -215,7 +219,7 @@ class CustomPrinter {
 			tabs = old;
 			s + ';\n$tabs}';
 		case EFor(e1, e2): 'for (${printExpr(e1)}) ${printExpr(e2)}';
-		case EIn(e1, e2): '${printExpr(e1)} in ${printExpr(e2)}';
+		// case EIn(e1, e2): '${printExpr(e1)} in ${printExpr(e2)}';
 		case EIf(econd, eif, null): 'if (${printExpr(econd)}) ${printExpr(eif)}';
 		case EIf(econd, eif, eelse): 'if (${printExpr(econd)}) ${printExpr(eif)} else ${printExpr(eelse)}';
 		case EWhile(econd, e1, true): 'while (${printExpr(econd)}) ${printExpr(e1)}';
