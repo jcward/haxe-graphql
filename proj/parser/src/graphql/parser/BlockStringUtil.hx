@@ -91,7 +91,7 @@ class BlockStringUtil {
 		}
 		var re = ~/\n/g;
 		if (indentation != '' && re.match(value)) {
-			value = re.map(value, (r) -> {
+			value = re.map(value, function(r) {
 				return '\n' + indentation;
 			});
 			result += value;
