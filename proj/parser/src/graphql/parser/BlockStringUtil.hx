@@ -8,7 +8,7 @@ class BlockStringUtil {
 		var linesReg = ~/\r\n|[\n\r]/g;
 		linesReg.match(rawString);
 		var lines = [];
-		linesReg.map(rawString, (r) -> {
+		linesReg.map(rawString, function(r) {
 			var m = r.matched(0);
 			lines.push(m);
 			return rawString;
@@ -104,7 +104,7 @@ class BlockStringUtil {
 		}
 		var reg = ~/"""/g;
 		if (reg.match(result)) {
-			result = reg.map(result, (r) -> {
+			result = reg.map(result, function(r) {
 				return '\\"""';
 			});
 		}

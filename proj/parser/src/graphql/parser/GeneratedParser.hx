@@ -625,7 +625,7 @@ private function parseList(lexer: Lexer, isConst:Bool): ListValueNode {
  */
 private function parseObject(lexer: Lexer, isConst:Bool): ObjectValueNode {
   var start = lexer.token;
-  var item = (lexer) -> parseObjectField(lexer, isConst);
+  var item = function(lexer) return parseObjectField(lexer, isConst);
   return {
     kind: Kind.OBJECT,
     fields: any(lexer, TokenKind.BRACE_L, item, TokenKind.BRACE_R),
