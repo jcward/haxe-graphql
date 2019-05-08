@@ -31,7 +31,7 @@ typedef Lexer = GeneratedLexer<ParseOptions>;
 // import inspect from '../jsutils/inspect';
 // import defineToJSON from '../jsutils/defineToJSON';
 /* import BR_L Source } from './source';
-import BR_L type GraphQLError, syntaxError } from '../error';
+// import BR_L type GraphQLError, syntaxError } from '../error';
 import BR_L
   type Lexer,
   type TokenKindEnum,
@@ -90,8 +90,8 @@ import BR_L
   type InputObjectTypeExtensionNode,
 } from './ast';
 
-import BR_L Kind } from './kinds';
-import BR_L DirectiveLocation } from './directiveLocation'; */
+// import BR_L Kind } from './kinds';
+// import BR_L DirectiveLocation } from './directiveLocation'; */
 
 /**
  * Configuration options to control parser behavior
@@ -315,7 +315,7 @@ private function parseVariableDefinition(lexer: Lexer): VariableDefinitionNode {
     kind: Kind.VARIABLE_DEFINITION,
     variable: parseVariable(lexer),
     type: { expectToken(lexer, TokenKind.COLON) ;  parseTypeReference(lexer) ; } /* WTH (,) block */,
-    defaultValue: expectOptionalToken(lexer, TokenKind.EQUALS) != null
+    defaultValue: expectOptionalToken(lexer, TokenKind.EQUALS)
       ? parseValueLiteral(lexer, true)
       : null/* undefined */,
     directives: parseDirectives(lexer, true),
@@ -375,7 +375,7 @@ private function parseField(lexer: Lexer): FieldNode {
   var nameOrAlias = parseName(lexer);
   var alias=null /* INIT */;
   var name=null /* INIT */;
-  if (expectOptionalToken(lexer, TokenKind.COLON) != null) {
+  if (expectOptionalToken(lexer, TokenKind.COLON)) {
     alias = nameOrAlias;
     name = parseName(lexer);
   } else {
@@ -450,7 +450,7 @@ private function parseFragment(
   expectToken(lexer, TokenKind.SPREAD);
 
   var hasTypeCondition = expectOptionalKeyword(lexer, 'on');
-  if (hasTypeCondition == null && peek(lexer, TokenKind.NAME)) {
+  if (!hasTypeCondition && peek(lexer, TokenKind.NAME)) {
     return /* CSMT */ cast {
       kind: Kind.FRAGMENT_SPREAD,
       name: parseFragmentName(lexer),
@@ -460,7 +460,7 @@ private function parseFragment(
   }
   return /* CSMT */ cast {
     kind: Kind.INLINE_FRAGMENT,
-    typeCondition: hasTypeCondition != null ? parseNamedType(lexer) : null/* undefined */,
+    typeCondition: hasTypeCondition ? parseNamedType(lexer) : null/* undefined */,
     directives: parseDirectives(lexer, false),
     selectionSet: parseSelectionSet(lexer),
     loc: loc(lexer, start),
@@ -625,7 +625,7 @@ private function parseList(lexer: Lexer, isConst:Bool): ListValueNode {
  */
 private function parseObject(lexer: Lexer, isConst:Bool): ObjectValueNode {
   var start = lexer.token;
-  var item = function(lexer) return parseObjectField(lexer, isConst);
+  var item = function(?lxr) return parseObjectField(lexer, isConst);
   return {
     kind: Kind.OBJECT,
     fields: any(lexer, TokenKind.BRACE_L, item, TokenKind.BRACE_R),
@@ -690,7 +690,7 @@ private function parseDirective(lexer: Lexer, isConst:Bool): DirectiveNode {
 public function parseTypeReference(lexer: Lexer): TypeNode {
   var start = lexer.token;
   var type=null /* INIT */;
-  if (expectOptionalToken(lexer, TokenKind.BRACKET_L) != null) {
+  if (expectOptionalToken(lexer, TokenKind.BRACKET_L)) {
     type = parseTypeReference(lexer);
     expectToken(lexer, TokenKind.BRACKET_R);
     type = /* CSMT2 */ ( cast {
@@ -701,7 +701,7 @@ public function parseTypeReference(lexer: Lexer): TypeNode {
   } else {
     type = /* */ cast parseNamedType(lexer);
   }
-  if (expectOptionalToken(lexer, TokenKind.BANG) != null) {
+  if (expectOptionalToken(lexer, TokenKind.BANG)) {
     return /* CSMT2 */ ( cast {
       kind: Kind.NON_NULL_TYPE,
       type:type, /* ESIOK: stupid inferred key name */
@@ -867,13 +867,13 @@ private function parseObjectTypeDefinition(lexer: Lexer): ObjectTypeDefinitionNo
  */
 private function parseImplementsInterfaces(lexer: Lexer): Array<NamedTypeNode> {
   var types = [];
-  if (expectOptionalKeyword(lexer, 'implements') != null) {
+  if (expectOptionalKeyword(lexer, 'implements')) {
     // Optional leading ampersand
     expectOptionalToken(lexer, TokenKind.AMP);
     do {
       types.push(parseNamedType(lexer));
     } while (
-      expectOptionalToken(lexer, TokenKind.AMP) != null ||
+      expectOptionalToken(lexer, TokenKind.AMP) ||
       // Legacy support for the SDL?
       (lexer.options.allowLegacySDLImplementsInterfaces &&
         peek(lexer, TokenKind.NAME))
@@ -945,7 +945,7 @@ private function parseInputValueDef(lexer: Lexer): InputValueDefinitionNode {
   expectToken(lexer, TokenKind.COLON);
   var type = parseTypeReference(lexer);
   var defaultValue=null /* INIT */;
-  if (expectOptionalToken(lexer, TokenKind.EQUALS) != null) {
+  if (expectOptionalToken(lexer, TokenKind.EQUALS)) {
     defaultValue = parseConstValue(lexer);
   }
   var directives = parseDirectives(lexer, true);
@@ -1011,12 +1011,12 @@ private function parseUnionTypeDefinition(lexer: Lexer): UnionTypeDefinitionNode
  */
 private function parseUnionMemberTypes(lexer: Lexer): Array<NamedTypeNode> {
   var types = [];
-  if (expectOptionalToken(lexer, TokenKind.EQUALS) != null) {
+  if (expectOptionalToken(lexer, TokenKind.EQUALS)) {
     // Optional leading pipe
     expectOptionalToken(lexer, TokenKind.PIPE);
     do {
       types.push(parseNamedType(lexer));
-    } while (expectOptionalToken(lexer, TokenKind.PIPE) != null);
+    } while (expectOptionalToken(lexer, TokenKind.PIPE));
   }
   return types;
 }
@@ -1360,7 +1360,7 @@ private function parseDirectiveLocations(lexer: Lexer): Array<NameNode> {
   var locations = [];
   do {
     locations.push(parseDirectiveLocation(lexer));
-  } while (expectOptionalToken(lexer, TokenKind.PIPE) != null);
+  } while (expectOptionalToken(lexer, TokenKind.PIPE));
   return locations;
 }
 
@@ -1406,25 +1406,7 @@ private function parseDirectiveLocation(lexer: Lexer): NameNode {
  * Returns a location object, used to identify the place in
  * the source that created a given parsed object.
  */
-// private function loc(lexer: Lexer, startToken: Token): Location /* | void */ {
-//   /* noLocation disabled */ {
-//     return ({ start:startToken.start, end:lexer.lastToken.end, source:lexer.source, startToken:startToken, endToken:lexer.lastToken }:Location);
-//   }
-// }
-
-private function Loc(startToken: Token, endToken: Token, source: Source) {
-  // this.start = startToken.start;
-  // this.end = endToken.end;
-  // this.startToken = startToken;
-  // this.endToken = endToken;
-  // this.source = source;
-  return { start:startToken.start, end: endToken.end, startToken:startToken, endToken:endToken, source:source };
-}
-
-// // Print a simplified form when appearing in JSON/util.inspect.
-// defineToJSON(Loc, function() {
-//   return { start: this.start, end: this.end };
-// });
+/* class / function Loc() removed */
 
 /**
  * Determines if the next token is of a given kind
@@ -1451,15 +1433,15 @@ private function expectToken(lexer: Lexer, kind: TokenKindEnum): Token {
 
 /**
  * If the next token is of the given kind, return that token after advancing
- * the lexer. Otherwise, do not change the parser state and return null/* undefined 
+ * the lexer. Otherwise, do not change the parser state and return null/* undefined
  */
-private function expectOptionalToken(lexer: Lexer, kind: TokenKindEnum): Token {
+private function expectOptionalToken(lexer: Lexer, kind: TokenKindEnum):Bool{
   var token = lexer.token;
   if (token.kind == kind) {
     lexer.advance();
-    return token;
+    return token!=null;
   }
-  return null/* undefined */;
+  return false/* undefined */;
 }
 
 /**
@@ -1480,15 +1462,15 @@ private function expectKeyword(lexer: Lexer, value:String): Token {
 
 /**
  * If the next token is a given keyword, return that token after advancing
- * the lexer. Otherwise, do not change the parser state and return null/* undefined .
+ * the lexer. Otherwise, do not change the parser state and return null/* undefined
  */
-private function expectOptionalKeyword(lexer: Lexer, value:String): Token {
+private function expectOptionalKeyword(lexer: Lexer, value:String):Bool{
   var token = lexer.token;
   if (token.kind == TokenKind.NAME && token.value == value) {
     lexer.advance();
-    return token;
+    return token!=null;
   }
-  return null/* undefined */;
+  return false/* undefined */;
 }
 
 /**
@@ -1516,7 +1498,7 @@ private function any<T>(
 {
   expectToken(lexer, openKind);
   var nodes = [];
-  while (expectOptionalToken(lexer, closeKind) == null) {
+  while (!expectOptionalToken(lexer, closeKind)) {
     nodes.push(parseFn(lexer));
   }
   return nodes;
@@ -1535,7 +1517,7 @@ private function many<T>(
   closeKind: TokenKindEnum): Array<T> {
   expectToken(lexer, openKind);
   var nodes = [parseFn(lexer)];
-  while (expectOptionalToken(lexer, closeKind) == null) {
+  while (!expectOptionalToken(lexer, closeKind)) {
     nodes.push(parseFn(lexer));
   }
   return nodes;

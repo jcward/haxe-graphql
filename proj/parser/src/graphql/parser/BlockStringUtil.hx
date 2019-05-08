@@ -1,3 +1,4 @@
+// ported by hand, based on: https://raw.githubusercontent.com/graphql/graphql-js/v14.3.0/src/language/blockString.js
 package graphql.parser;
 
 using StringTools;
