@@ -1,6 +1,6 @@
 {
   "name": "gql2hx",
-  "version": "0.0.22",
+  "version": "0.0.23",
   "description": "Convert GraphQL schema to Haxe definitions",
   "perferGlobal": true,
   "license": "MIT",
@@ -16,11 +16,13 @@
   "bugs": {
     "url": "https://github.com/jcward/haxe-graphql/issues"
   },
-  "bin": { "gql2hx": "./dist/index.js" },
+  "bin": {
+    "gql2hx": "./dist/index.js"
+  },
   "main": "dist/index.js",
   "dependencies": {
     "commander": "^2.15.1",
-    "graphql": "^0.13.2"
+    "graphql": "^14.3.0"
   },
   "devDependencies": {
     "@types/node": "^10.1.2"

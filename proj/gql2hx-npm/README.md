@@ -22,6 +22,7 @@ Development sponsored by: [www.wootmath.com](https://www.wootmath.com) [simbulus
 Release notes: 
 ---
 
+ 0.0.23 - Updated to graphql-js v14.3.0, block string support thanks to github.com/darmie  
  0.0.22 - Improved error reporting / issue #35  
  0.0.21 - Added support for graphql 'extend type' / issue #33  
  0.0.20 - Added union .as__T cast helper functions  
