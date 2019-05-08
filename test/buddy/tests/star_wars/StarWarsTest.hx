@@ -71,8 +71,8 @@ class StarWarsTest extends BuddySuite
         var stdout = p.stdout.readAll().toString();
         stdout.should.contain('Luke appears in 3 episodes');
         var stderr = p.stderr.readAll().toString();
-        stderr.should.contain(':6: characters 18-22 : Warning : Human');
-        stderr.should.contain(':13: characters 18-36 : Warning : Droid');
+        stderr.should.match(~/:6: characters \d+\-\d+ : Warning : Human/);
+        stderr.should.match(~/:13: characters \d+\-\d+ : Warning : Droid/);
       });
 
     });

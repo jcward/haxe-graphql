@@ -18,7 +18,7 @@ type SomeType {
   friends( named: [String] = ["default_joe", "default_suzie"],
            id: ID=null,
            has_id: Boolean = false,
-## TODO: BlockString disabled... ##      blk_str: String = """A block " "\" " quote!!""" ,
+           blk_str: String = """A block " "\" " quote!!""" ,
            str : String = "Hello World" ,
            e : ASCENDING ,
            obj: Person = { key:[ ASCENDING, 3.5e-3, false ], def:null },
