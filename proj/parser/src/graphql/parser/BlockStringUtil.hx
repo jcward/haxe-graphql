@@ -6,25 +6,24 @@ using StringTools;
 class BlockStringUtil {
 	public static function dedentBlockStringValue(rawString:String):String {
 		// Expand a block string's raw value into independent lines.
-		var linesReg = ~/\r\n|[\n\r]/g;
-		linesReg.match(rawString);
-		var lines = [];
-		linesReg.map(rawString, function(r) {
-			var m = r.matched(0);
-			lines.push(m);
-			return rawString;
-		});
-		//   var lines = rawString.split(/\r\n|[\n\r]/g);
 
+		// The EReg approach does not work, eats extra spaces:
+		var linesReg = ~/\r\n|[\n\r]/g;
+		var lines = linesReg.split(rawString);
+/*
+		var lines = [];
+		for (l1 in rawString.split("\r\n")) {
+			for (l2 in l1.split("\n")) {
+				for (l3 in l2.split("\r")) lines.push(l3);
+			}
+		}
+*/
 		// Remove common indentation from all lines but first.
 		var commonIndent = getBlockStringIndentation(lines);
 
 		if (commonIndent != 0) {
 			for (i in 1...lines.length) {
-                var sl = new StringSlice(lines[i], 0, lines[i].length);
-                var ite = new IntIterator(0, commonIndent);
-                
-				lines[i] = sl.slice(ite).toString();
+				lines[i] = lines[i].substr(commonIndent);
 			}
 		}
 
@@ -42,7 +41,7 @@ class BlockStringUtil {
 
 	// @internal
 	public static function getBlockStringIndentation(lines:Array<String>):Int {
-		var commonIndent:Int = null;
+		var commonIndent:Null<Int> = null;
 
 		for (i in 1...lines.length) {
 			var line = lines[i];
@@ -64,7 +63,7 @@ class BlockStringUtil {
 
 	private static function leadingWhitespace(str:String) {
 		var i = 0;
-		while (i < str.length && (str.substring(i) == ' ' || str.substring(i) == '\t')) {
+		while (i < str.length && (str.charCodeAt(i)==32 || str.charCodeAt(i)==9)) {
 			i++;
 		}
 		return i;
@@ -81,7 +80,7 @@ class BlockStringUtil {
 	 */
 	public static function printBlockString(value:String, indentation:String = '', preferMultipleLines:Bool = false):String {
 		var isSingleLine = value.indexOf('\n') == -1;
-		var hasLeadingSpace = value.substring(0) == ' ' || value.substring(0) == '\t';
+		var hasLeadingSpace = value.substr(0,1) == ' ' || value.substr(0,1) == '\t';
 		var hasTrailingQuote = value.substring(value.length - 1) == '"';
 		var printAsMultipleLines = !isSingleLine || hasTrailingQuote || preferMultipleLines;
 
