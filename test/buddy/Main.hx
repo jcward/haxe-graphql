@@ -19,6 +19,7 @@ class Main {
                              new tests.basic.CovarianceUnion(),
                              new tests.basic.CovarianceInterface(),
                              new tests.args.ArgsDefaultValues(),
+                             new tests.args.ArgsBlockString(),
                              new tests.operations.BasicQuery(),
                              new tests.operations.ArgsQuery(),
                              new tests.operations.QueryTypeGeneration(),
