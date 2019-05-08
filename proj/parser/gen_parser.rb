@@ -2,12 +2,15 @@
 
 require_relative './gen_shared'
 
-VERSION_TAG = "v0.13.2"
+VERSION_TAG = "v14.3.0"
 url = "https://raw.githubusercontent.com/graphql/graphql-js/#{ VERSION_TAG }/src/language/parser.js"
 javascript = `curl --silent '#{ url }'`
 
 haxe = javascript
 haxe.sub!(/(import {.*?directiveLocation';)/m) { |imports| "/* #{ imports.gsub(/{/, "BR_L") } */" }
+
+# Comment out imports
+haxe.gsub!(/^(import .*?from)/, "// \\1")
 
 GenShared::export_type_to_typedef!(haxe)
 #haxe.gsub!(/export type/, "typedef /* export type */")
@@ -42,7 +45,7 @@ haxe.gsub!(/Lexer<.>/, "Lexer")
 haxe.gsub!("if (!lexer.options.noLocation)", "/* noLocation disabled */")
 
 # Remove Loc "class"
-haxe.sub!(/^private function loc\((.*?)}.*Loc.prototype.*?}.*?}/m, "/* class / function Loc() removed */")
+haxe.sub!(/^private function loc\(.*?defineToJSON.*?}\);/m, "/* class / function Loc() removed */")
 haxe.sub!(/new Loc\(startToken, lexer.lastToken, lexer.source\)/, "({ start:startToken.start, end:lexer.lastToken.end, source:lexer.source, startToken:startToken, endToken:lexer.lastToken }:Location)")
 
 # Some unions
@@ -63,6 +66,9 @@ haxe.gsub!(/\((expect.*?\)),(.*?\))\)/, "{ \\1 ; \\2 ; } /* WTH (,) block */")
 haxe.gsub!(/atToken \|\| lexer.token/, "atToken!=null ? atToken : lexer.token")
 
 haxe.gsub!(/\bundefined\b/, "null/* undefined */")
+
+# But there's one inside a comment :(
+haxe.gsub!(/undefined \*\/\.\s+\*\//, "undefined\n */")
 
 haxe.gsub!(/var (\w+);/, "var \\1=null /* INIT */;")
 
@@ -103,6 +109,20 @@ haxe.gsub!(/(parseDescription.*?)if (\(peekDescription.*?\)) {/m, "\\1if (!\\2) 
 
 haxe.gsub!(/DirectiveLocation.hasOwnProperty/, "ValidDirectiveLocations.get")
 
+# arrow function
+haxe.sub!(/item = \(\) => parseObjectField\(/, "item = function(?lxr) return parseObjectField(")
+
+# comment out Loc defineToJSON
+haxe.sub!(/(defineToJSON\(Loc.*?}\);)/m, "/* \\1 */")
+
+# expectOptionalKeyword and expectOptionalToken should return Bool
+haxe.gsub!(/(tion expectOptional.*?return null)/m) { |blk|
+  blk.sub!(/(tion expectOptional.*?\)\s*:)\s*\?\s*(\w+)\s*/, "\\1Bool");
+  blk.sub!(/return token/, "return token!=null");
+  blk.sub!(/return null/, "return false");
+  blk
+}
+   
 # - - - -  write output
 puts <<eof
 package graphql.parser;

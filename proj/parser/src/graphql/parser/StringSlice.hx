@@ -49,6 +49,12 @@ private class Data {
       representation = string.substring(start, end);
     return representation;
   }
+
+  public function charCodeAt(idx:Int):Int {
+    if (representation == null)
+      representation = string.substring(start, end);
+    return representation.charCodeAt(idx);
+  }
   
 }
 

@@ -2,12 +2,15 @@
 
 require_relative './gen_shared'
 
-VERSION_TAG = "v0.13.2"
+VERSION_TAG = "v14.3.0"
 url = "https://raw.githubusercontent.com/graphql/graphql-js/#{ VERSION_TAG }/src/language/lexer.js"
 javascript = `curl --silent '#{ url }'`
 
 haxe = javascript
 haxe.sub!(/(import type.*?blockStringValue';)/m, "/* \\1 */")
+
+# Comment out imports
+haxe.gsub!(/^(import .*?from)/, "// \\1")
 
 GenShared::export_to_function!(haxe)
 
@@ -82,7 +85,7 @@ haxe.gsub!(/Token \| null/, "Null<Token>")
 haxe.gsub!(/export type Lexer.*?};/m, '')
 
 # Move Tok helper class out of class Lexer
-haxe.gsub!(/private function Tok.*?toJSON.*?};\s+};/m, '')
+haxe.gsub!(/private function Tok.*?ToJSON.*?};\s+}\);/m, '')
 #tok_class = $&
 #tok_class.sub!(/value\?:String\){/, "?value:String)\n{")
 #tok_defs = "public var value:String;\npublic var next: Null<Token>;\n"
@@ -94,6 +97,7 @@ haxe.gsub!(/private function Tok.*?toJSON.*?};\s+};/m, '')
 #tok_class.sub!(/Tok.prototype.toJSON = Tok.prototype.inspect = function toJSON/, "public function toJSON")
 #haxe = haxe + "\n\n} // end of class Lexer\n\n" + tok_class + "\n}"
 
+haxe.gsub!(/dedentBlockStringValue\(/, 'BlockStringUtil.dedentBlockStringValue(')
 
 # syntax error now takes line and lineStart (for reporting pos)
 haxe.gsub!(/syntaxError\(\s*source/m, "syntaxError(source, line, lineStart")
@@ -122,7 +126,8 @@ haxe.gsub!(/source.body/, "source/* source.body */")
 haxe.gsub!(/readToken\(this/, "readToken(cast this")
 haxe.gsub!(/token.next \|\|/, "(token.next!=null) ? token.next :")
 
-haxe.gsub!(/(isNaN\(code\))/, "false /* \\1 */")
+haxe.gsub!(/(\bisNaN\(code\))/, "false /* \\1 */")
+haxe.gsub!(/\bisNaN\(/, "Math.isNaN(")
 haxe.gsub!(/JSON.stringify/, "haxe.Json.stringify")
 
 haxe.gsub!(/(function \w+\s*\(\s*source\s*),/, "\\1:Source,")
