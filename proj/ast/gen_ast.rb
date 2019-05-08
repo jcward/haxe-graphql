@@ -4,10 +4,11 @@ VERSION_TAG = "v14.3.0"
 url = "https://raw.githubusercontent.com/graphql/graphql-js/#{ VERSION_TAG }/src/language/ast.js"
 
 # Local for development...
-url = "http://127.0.0.1/ast.js"
+# url = "http://127.0.0.1/ast.js"
 javascript = `curl --silent '#{ url }'`
 
 haxe = javascript
+File.open('/tmp/ast.js', 'w') { |f| f.puts javascript }
 
 haxe.gsub!(/export type/, "typedef /* export type */")
 haxe.gsub!(/(\w+)\?:(\s+\?)?/, "?\\1 /* opt */ :")
@@ -19,6 +20,9 @@ haxe.gsub!(/:\s*number\b/, ":Int /* number */")
 
 # Remove lading + signs
 haxe.gsub!(/^(\s+)\+/, "\\1")
+
+# Remove pipes from {| |}
+haxe.gsub!(/{\|/, "{").gsub!(/\|}/, "}")
 
 # Replace node unions with BaseNode
 haxe.gsub!(/Node =(\s*\n\s+\|.*?;)/m, "Node = BaseNode; /* \\1 */")
@@ -32,6 +36,7 @@ haxe.gsub!(/value:String \| void/, "?value:Null<String>")
 
 # Comment out imports
 haxe.gsub!(/^(import type .*)/, "// \\1")
+haxe.gsub!(/^(import { type .*)/, "// \\1")
 
 # Kind string consts
 haxe.gsub!(/kind: ('\w+')/, "kind: String, // \\1")
@@ -74,6 +79,8 @@ typedef TypeNode = { > BaseNode,
   // Calling these optionals makes us able to simply null-check them:
   ?name: NameNode, // Only for NamedTypeNode
   ?type: TypeNode, // Not for NamedTypeNode
+  ?operationTypes: Array<OperationTypeDefinitionNode>,
+  ?directives: Array<DirectiveNode>,
 }
 
 // typedef NamedOrListTypeNode = BaseNode; //  NamedTypeNode | ListTypeNode
@@ -144,6 +151,7 @@ typedef TypeNode = { > BaseNode,
   
   // Type System Definitions
   var SCHEMA_DEFINITION = 'SchemaDefinition';
+  var SCHEMA_EXTENSION = 'SchemaExtension';
   var OPERATION_TYPE_DEFINITION = 'OperationTypeDefinition';
   
   // Type Definitions
@@ -156,7 +164,7 @@ typedef TypeNode = { > BaseNode,
   var ENUM_TYPE_DEFINITION = 'EnumTypeDefinition';
   var ENUM_VALUE_DEFINITION = 'EnumValueDefinition';
   var INPUT_OBJECT_TYPE_DEFINITION = 'InputObjectTypeDefinition';
-  
+
   // Type Extensions
   var SCALAR_TYPE_EXTENSION = 'ScalarTypeExtension';
   var OBJECT_TYPE_EXTENSION = 'ObjectTypeExtension';
