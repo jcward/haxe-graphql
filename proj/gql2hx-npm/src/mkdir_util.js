@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
-function mkDirByPathSync(targetDir, {isRelativeToScript = false} = {}) {
+function mkDirByPathSync(targetDir) {
   const sep = path.sep;
   const initDir = path.isAbsolute(targetDir) ? sep : '';
-  const baseDir = isRelativeToScript ? __dirname : '.';
+  const baseDir = '.';
 
   targetDir.split(sep).reduce((parentDir, childDir) => {
     const curDir = path.resolve(baseDir, parentDir, childDir);
