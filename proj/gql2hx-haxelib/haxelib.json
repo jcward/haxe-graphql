@@ -3,9 +3,9 @@
 	"url": "http://github.com/jcward/gql2hx",
 	"license": "MIT",
 	"tags": ["cross","macro","utility"],
-	"description": "A macro library for generating Haxe type definitions from GraphQL schema.",
+	"description": "A (placeholder / TBD) macro library for generating Haxe type definitions from GraphQL schema.",
 	"version": "0.0.2",
-	"releasenote": "See recently closed issues in github.",
+	"releasenote": "Noted placeholder status.",
 	"contributors": [ "jeff.ward" ],
 	"dependencies": {}
 }

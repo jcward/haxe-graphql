@@ -16,7 +16,7 @@ See the various directories under `./proj`:
 - [hxgen](./proj/hxgen) - Haxe Code Generator (from GraphQL AST)
 - [parser](./proj/parser) - Pure-Haxe GraphQL parser (direct port from graphql-js v14.3.0)
 - [gql2hx-npm](./proj/gql2hx-npm) - NPM module packaging the Haxe Generator
-- [gql2hx-haxelib](./proj/gql2hx-haxelib) - Haxelib module providing macro-time access to these tools
+- [gql2hx-haxelib](./proj/gql2hx-haxelib) - (Placeholder / TBD) Haxelib module providing macro-time access to these tools
 - [ast](./proj/ast) - GraphQL AST Definitions
 - [webdemo](./proj/webdemo) - live demo of .graphql -> Haxe code
 

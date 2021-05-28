@@ -7,7 +7,7 @@ read -r -p "Are you sure? [y/N] " response
 if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]
 then
   rm -f gql2hx.zip
-  zip -r gql2hx.zip graphql haxelib.json README.md
+  zip -r gql2hx.zip haxelib.json README.md
   zip -j gql2hx.zip ../LICENSE
   haxelib submit gql2hx.zip
 else
