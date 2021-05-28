@@ -132,8 +132,6 @@ haxe.gsub!(/JSON.stringify/, "haxe.Json.stringify")
 
 haxe.gsub!(/(function \w+\s*\(\s*source\s*),/, "\\1:Source,")
 
-haxe.gsub!(/(blockStringValue\(\w+\))/, "{ throw 'TODO: implement \\1'; null; }")
-
 haxe.gsub!(/private function lookahead\(/, "public function lookahead(")
 
 haxe.gsub!(/body:String/, "body:Source")
