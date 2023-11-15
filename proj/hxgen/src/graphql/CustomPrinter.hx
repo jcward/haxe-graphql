@@ -50,6 +50,9 @@ class CustomPrinter {
 		case OpNot: "!";
 		case OpNeg: "-";
 		case OpNegBits: "~";
+		#if (haxe >= "4.2")
+		case OpSpread: "...";
+		#end
 	}
 
 	public function printBinop(op:Binop) return switch(op) {
@@ -76,7 +79,11 @@ class CustomPrinter {
 		case OpInterval: "...";
 		case OpArrow: "=>";
 		#if (haxe_ver >= 4.000) 
-		case OpIn: "in"; 
+		case OpIn: "in";
+		#end
+		case OpIn: "in";
+		#if (haxe >= "4.3")
+		case OpNullCoal: "?.";
 		#end
 		case OpAssignOp(op):
 			printBinop(op)
@@ -127,8 +134,9 @@ class CustomPrinter {
 		case TAnonymous(fields): "{ " + [for (f in fields) printField(f) + fieldDelimiter+" "].join("") + "}";
 		case TParent(ct): "(" + printComplexType(ct) + ")";
 		case TOptional(ct): "?" + printComplexType(ct);
+		case TNamed(n, ct): n + ":" + printComplexType(ct);
 		case TExtend(tpl, fields): '{> ${tpl.map(printTypePath).join(" >, ")}, ${fields.map(printField).join(", ")} }';
-		case _: "";
+		case TIntersection(tl): tl.map(printComplexType).join(" & ");
 	}
 
 	public function printMetadata(meta:MetadataEntry) return
@@ -146,6 +154,10 @@ class CustomPrinter {
 		#if (haxe_ver >= 4.000) 
 		case AExtern: "extern";
 		case AFinal: "final";
+		#end
+		#if (haxe >= "4.2")
+		case AOverload: "/* overload? */";
+		case AAbstract: "/* abstract? */";
 		#end
 	}
 
@@ -251,8 +263,13 @@ class CustomPrinter {
 		case EThrow(e1): "throw " +printExpr(e1);
 		case ECast(e1, cto) if (cto != null): 'cast(${printExpr(e1)}, ${printComplexType(cto)})';
 		case ECast(e1, _): "cast " +printExpr(e1);
+		#if (haxe >= "4.2")
+		case EIs(e1, ct): '${printExpr(e1)} is ${printComplexType(ct)}';
+		#end
 		case EDisplay(e1, _): '#DISPLAY(${printExpr(e1)})';
+		#if (haxe < "4.3")
 		case EDisplayNew(tp): '#DISPLAY(${printTypePath(tp)})';
+		#end
 		case ETernary(econd, eif, eelse): '${printExpr(econd)} ? ${printExpr(eif)} : ${printExpr(eelse)}';
 		case ECheckType(e1, ct): '(${printExpr(e1)} : ${printComplexType(ct)})';
 		case EMeta(meta, e1): printMetadata(meta) + " " +printExpr(e1);
@@ -325,6 +342,17 @@ class CustomPrinter {
 						tabs + printFieldWithDelimiter(f);
 					}].join("\n")
 					+ "\n}";
+				#if (haxe >= "4.2")
+				case TDField(kind, access):
+					tabs = old;
+					(access != null && access.length > 0 ? access.map(printAccess).join(" ") + " " : "")
+					+ switch (kind) {
+						case FVar(type, eo): ((access != null && access.has(AFinal)) ? '' : 'var ') + '${t.name}' + opt(type, printComplexType, " : ") + opt(eo, printExpr, " = ") + ";";
+						case FProp(get, set, type, eo): 'var ${t.name}($get, $set)' + opt(type, printComplexType, " : ") + opt(eo, printExpr, " = ") + ";";
+						case FFun(func): 'function ${t.name}' + printFunction(func) + switch func.expr { case {expr: EBlock(_)}: ""; case _: ";"; };
+					}
+
+				#end
 			}
 
 		tabs = old;

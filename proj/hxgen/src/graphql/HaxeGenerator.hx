@@ -1033,7 +1033,7 @@ typedef ConstrainedFieldType = { constraints:Array<String>, field_node:Selection
 // StringMap with Array Access
 @:forward
 abstract StringMapAA<T>(haxe.ds.StringMap<T>) from haxe.ds.StringMap<T> to haxe.ds.StringMap<T> {
-  public function new() { return new haxe.ds.StringMap<T>(); }
+  public function new() { this = new haxe.ds.StringMap<T>(); }
   @:arrayAccess
   public inline function get(key:String) {
     return this.get(key);
