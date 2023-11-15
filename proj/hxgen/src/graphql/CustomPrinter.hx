@@ -81,7 +81,6 @@ class CustomPrinter {
 		#if (haxe_ver >= 4.000) 
 		case OpIn: "in";
 		#end
-		case OpIn: "in";
 		#if (haxe >= "4.3")
 		case OpNullCoal: "?.";
 		#end
