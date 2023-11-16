@@ -1,17 +1,1 @@
-
-type Foo {
-  age: Int
-  name: String
-  stars: S
-}
-
-type Query {
-  get_invalid: Foo
-}
-
-query GetInvalidTypedField {
-  get_invalid {
-    name
-    stars
-  }
-}
+issue43.gql
