@@ -511,10 +511,15 @@ class HaxeGenerator
         switch ptr {
           case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
             error('${ err_prefix }Expecting type ${ tname } to have field ${ name }!', true);
-          case TStruct(tname, fields):
-            var field = fields[name];
-            if (field==null) error('${ err_prefix }Expecting type ${ tname } to have field ${ name }!', true);
-            if (path.length==0) {
+          case TStruct(tname, fields):                
+          var field:GQLFieldType;
+          if(name == '__typename') {
+            field =  { type:TPath('String'), is_array:false, is_optional:true };
+          } else {
+            field = fields[name];
+          }
+          if (field==null) error('${ err_prefix }Expecting type ${ tname } to have field ${ name }!', true);
+          if (path.length==0) {
               resolve_type(field.type, err_prefix);
               return field;
             }
@@ -764,7 +769,6 @@ class HaxeGenerator
           next_type_path.push(name);
           var resolved = resolve_field(next_type_path, gt_info);
           var type = resolve_type(resolved.type);
-  
           switch type {
             case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
               if (has_sub_selections) {
@@ -776,7 +780,9 @@ class HaxeGenerator
                 error('Must specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }', true);
               }
               if (is_union(tname)) {
-                if (field_node.selectionSet.selections.find(function(sn) return sn.kind==Kind.FIELD)!=null) {
+                if (field_node.selectionSet.selections.find(function(sn) { 
+                  return sn.kind==Kind.FIELD && Reflect.field(cast sn, 'name').value!='__typename'; 
+                })!=null) {
                   error('Can only specify fragment selections of union ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }', true);
                 }
               }
@@ -967,7 +973,6 @@ class GQLTypeTools
         var field = { name:field_name, kind:FVar(ct, null), meta:[], pos:FAKE_POS };
         if (gql_f.is_optional) field.meta.push({ name:":optional", pos:FAKE_POS });
         return field;
-
       case TAnon(any): throw 'Non-struct types are not supported in TAnon: ${ any }';
     }
   }
