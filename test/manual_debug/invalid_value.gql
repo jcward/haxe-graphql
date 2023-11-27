@@ -1,0 +1,17 @@
+
+type Foo {
+  age: Int
+  name: String
+  stars: String
+}
+
+type Query {
+  get_invalid: Foo
+}
+
+query GetInvalidTypedField {
+  get_invalid {
+    name
+    stars
+  }
+}
