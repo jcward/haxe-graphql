@@ -291,7 +291,7 @@ class CustomPrinter {
 	public function printTypeDefinition(t:TypeDefinition, printPackage = true):String {
 		var old = tabs;
 		tabs = tabString;
-
+		trace(t.name);
 		var str = t == null ? "#NULL" :
 			(printPackage && t.pack.length > 0 && t.pack[0] != "" ? "package " + t.pack.join(".") + ";\n" : "") +
 			(t.meta != null && t.meta.length > 0 ? t.meta.map(printMetadata).join(" ") + " " : "") + (t.isExtern ? "extern " : "") + switch (t.kind) {
@@ -355,6 +355,7 @@ class CustomPrinter {
 			}
 
 		tabs = old;
+		trace(str);
 		return str;
 	}
 

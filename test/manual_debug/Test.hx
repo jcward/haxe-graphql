@@ -1,5 +1,7 @@
 package;
 
+import Playground;
+
 class Test
 {
   public static function main()
@@ -12,6 +14,19 @@ class Test
     // test('arguments.gql');
     // test('schema-kitchen-sink.graphql');
     // var source = sys.io.File.getContent(fn);
+
+    // Idea is to return the SDL Union as a Haxe Enum
+    // var pm = ContentModule.OnPollModule({content_type:POLL, poll_id:'1234'});
+    // var tm = ContentModule.OnTasklistModule({content_type:TASKLIST,tasklist_id: '1234'});
+    // var cm = SagaAPICMSClient.GetContentModuleById(/*..*/);
+    // switch (cm) {
+    //   case ContentModule.OnPollModule({content_type:POLL, poll_id:'1234'}):
+    //     trace('poll');
+    //   case ContentModule.OnTasklistModule({content_type:TASKLIST,tasklist_id: '1234'}):
+    //     trace('tasklist');
+    //   default:
+    //     trace('default');
+    // }
 
     trace('============================================================');
     trace('============================================================');
