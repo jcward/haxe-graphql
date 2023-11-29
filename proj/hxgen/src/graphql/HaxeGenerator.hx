@@ -511,7 +511,7 @@ class HaxeGenerator
         switch ptr {
           case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
             error('${ err_prefix }Expecting type ${ tname } to have field ${ name }!', true);
-          case TStruct(tname, fields):                
+          case TStruct(tname, fields):
           var field:GQLFieldType;
           if(name == '__typename') {
             field =  { type:TPath('String'), is_array:false, is_optional:true };
@@ -780,8 +780,8 @@ class HaxeGenerator
                 error('Must specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }', true);
               }
               if (is_union(tname)) {
-                if (field_node.selectionSet.selections.find(function(sn) { 
-                  return sn.kind==Kind.FIELD && Reflect.field(cast sn, 'name').value!='__typename'; 
+                if (field_node.selectionSet.selections.find(function(sn) {
+                  return sn.kind==Kind.FIELD && Reflect.field(cast sn, 'name').value!='__typename';
                 })!=null) {
                   error('Can only specify fragment selections of union ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }', true);
                 }
@@ -789,7 +789,7 @@ class HaxeGenerator
 
               var sub_type_name = (depth==0 && StringTools.endsWith(type_name, OP_OUTER_SUFFIX)) ?
                 StringTools.replace(type_name, OP_OUTER_SUFFIX, OP_INNER_SUFFIX) : type_name+DEFAULT_SEPARATOR+name;
-  
+
               var sub_type = generate_type_based_on_selection_set(sub_type_name, gt_info, field_node.selectionSet, tname, depth+1);
               var f = { type:null, is_array:resolved.is_array, is_optional:resolved.is_optional };
               fields[alias] = f;
@@ -815,7 +815,7 @@ class HaxeGenerator
     } else {
       return _types_by_name[type_name];
     }
-    
+
   }
 
   // Per the discussion at https://github.com/facebook/graphql/issues/204, the operation
@@ -1011,18 +1011,19 @@ class GQLTypeTools
         }
         if(type_paths.length == 2) {
         var tps = type_paths.toString();
-          var as_either_template = ' public inline function as_either():Either<::(tps)::> { 
-            if(this.__typename == "::(type_paths[0])::)") {
+          var as_either_template = ' public inline function as_either():Either<::(tps)::> {
+            if(~/this.__typename$/.match("${type_paths[0]}")) {
               return Left(this);
-            } else if(this.__typename == "::(type_paths[1])::") {
+            } else if(~/this.__typename$/.match("${type_paths[1]}")) {
               return Right(this);
             } else {
               throw "invalid type";
             }
           }
           ';
+          // Need to do this a a template expansion when do OneOf instead of Either
           var either =new haxe.Template(as_either_template);
-          writer.append(either.execute({tps:tps}));
+          writer.append(either.execute({tps:tps, type_paths:type_paths}));
         }
         writer.append('}');
         return writer.toString();
