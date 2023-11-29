@@ -62,3 +62,4 @@ typings/
 
 haxelib/gql2hx.zip
 .tmp
+.last_build.json
