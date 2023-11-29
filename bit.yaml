@@ -1,0 +1,6 @@
+---
+name: haxe-graphql
+builder: NullBuilder
+dependencies: 
+  bit:
+    - gql2hx
