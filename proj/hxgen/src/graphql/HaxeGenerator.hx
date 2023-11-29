@@ -1009,21 +1009,21 @@ class GQLTypeTools
           writer.append(' public inline function as${ HaxeGenerator.DEFAULT_SEPARATOR }${ as_name }():${ type_name } return cast this;');
 
         }
-
+        if(type_paths.length == 2) {
         var tps = type_paths.toString();
-        var as_either_template = ' public inline function as_either():Either<::(tps)::> { 
-          if(this.__typename == "::(type_paths[0])::)") {
-            return Left(this);
-          } else if(this.__typename == "::(type_paths[1])::") {
-            return Right(this);
-          } else {
-            throw "invalid type";
+          var as_either_template = ' public inline function as_either():Either<::(tps)::> { 
+            if(this.__typename == "::(type_paths[0])::)") {
+              return Left(this);
+            } else if(this.__typename == "::(type_paths[1])::") {
+              return Right(this);
+            } else {
+              throw "invalid type";
+            }
           }
+          ';
+          var either =new haxe.Template(as_either_template);
+          writer.append(either.execute({tps:tps}));
         }
-        ';
-        var either =new haxe.Template(as_either_template);
-        writer.append(either.execute({tps:tps}));
-
         writer.append('}');
         return writer.toString();
     }

@@ -1,8 +1,51 @@
+###################
+# Enums
+###################
+
+
+###################
+# Types
+###################
+
+###################
+# Inputs
+###################
+
+
+########################
+# Queries and Mutations
+########################
+
+extend type Query
+{
+  cms_alive(dummy: String!):StatusWithMsgPayload!
+  cms_resolver(dummy: String!):StatusWithMsgPayload!
+}
+
+extend type Mutation
+{
+  cms_mutator(dummy: String!):StatusWithMsgPayload!
+}
+
+
+
+
+###################
+# Enums
+###################
+
+
+###################
+# Types
+###################
+
 enum ContentModuleType 
 {
   POLL
   TASKLIST
 }
+
+union ContentModule = PollModule | TaskListModule
 
 type TaskListModule {
   content_type: ContentModuleType!
@@ -14,12 +57,1566 @@ type PollModule {
   poll_id: ID!
 }
 
-union ContentModule = PollModule | TaskListModule
 
-type Query
+###################
+# Inputs
+###################
+
+
+########################
+# Queries and Mutations
+########################
+
+extend type Query
 {
-   content_module_by_id(id: ID!): ContentModule!
+  content_module_by_id(id: ID!): ContentModule!
 }
+
+#extend type Mutation
+#{
+#
+#}
+
+
+
+
+
+# Descriptions: Types for LearnGalleryContentController.hx
+
+###################
+# Types
+###################
+
+type SubjectFilters {
+  name: String!
+  tags: [String!]!
+  filters: [String!]!
+}
+
+type SiloFilters {
+  content_silo: String!
+  subjects: [SubjectFilters]!
+}
+
+###################
+# Inputs
+###################
+
+input ContentSearchArgs {
+  content_silo: String!
+  search_terms: [String!]
+  title_search_terms: String
+  activity_search: Boolean
+  span_search:Boolean
+  limit: Int
+  offset: Int
+  user_id: String
+}
+
+########################
+# Queries and Mutations
+########################
+
+extend type Query
+{
+  content_silo_filters(content_silo: String!):SiloFilters!
+  content_by_search_args(input: ContentSearchArgs!):PaginatedContent!
+}
+
+
+# Base Query
+type Query {
+  version : String
+}
+
+# Base Mutation
+type Mutation {
+  version : String
+}
+
+# Generic status payload for mutators
+type StatusPayload {
+  success   : Boolean!
+}
+
+# Generic status payload (with optional error message)
+type StatusWithMsgPayload {
+  success   : Boolean!
+  msg       : String
+}
+
+type StatusWithErrorsPayload {
+  success   : SuccessState!
+  errors    : [String]
+}
+
+enum SuccessState {
+  SUCCESS
+  PARTIAL
+  FAILURE
+}
+
+type StatusIDPayload {
+  success   : Boolean!
+  id        : String
+}
+
+# Generic payload for refetch operations
+type RefetchPayload {
+  id         : String
+  operation  : RefetchOperation
+  success    : Boolean!
+}
+
+# CRUD refetch operation
+enum RefetchOperation {
+  INSERT
+  READ
+  DELETE
+  UPDATE
+  NONE
+}
+
+type DateTimeRange {
+  start : DateTime!
+  end   : DateTime!
+}
+
+input DateTimeRangeInput {
+  start : DateTime!
+  end   : DateTime!
+}
+
+type TimeRange {
+  start : Time!
+  end   : Time!
+}
+
+input TimeRangeInput {
+  start : Time!
+  end   : Time!
+}
+
+enum ClientUserType {
+  SCHOLAR
+  TUTOR
+  ADMIN
+}
+
+type User {
+  user_id                 : String!
+  username                : String!
+  email_verified          : Boolean!
+  created                 : String!
+  last_update             : String!
+  user_type               : ClientUserType!
+  role                    : UserRole!
+  organization            : String!
+  email                   : String
+  name_first              : String
+  name_last               : String
+  phone                   : String
+}
+
+type UserGroup {
+  user_group_id           : String!
+  user_group_name         : String!
+  users                   : [String!]
+  group_context           : GroupContext
+}
+
+enum UserRole {
+  USER # Generic user role
+  TUTOR
+  SCHOLAR
+  ADMIN
+  LEARNING_COORDINATOR
+  SITE_DIRECTOR
+  DIRECTOR_OF_PROGRAMS
+  SKYE_USER
+  COACH_USER
+}
+
+# Details of a group's function
+# TODO this should be a union type when we have different app contexts that will utilize this
+type GroupContext {
+  owner_id: String!         # The SD or Tutor who owns this group
+  group_id: String!         # The SQL group_id
+  group_type: GroupType!    # UNASSIGNED_SCHOLARS or CLASS_PERIOD
+  period_name: String       # The period number
+  block_index: Int          # Index representing A or B block
+  # ! TODO 3620 remove this - making it optional for now
+  app_context: String   # The app context in which this group is used
+}
+
+enum GroupType {
+  UNASSIGNED_SCHOLARS
+  CLASS_PERIOD
+}
+
+# Auth inputs also used by IAM
+input RegisterNewUserInput {
+  email: String!
+  name_first: String!
+  name_last: String!
+  password: String!
+  phone: String
+}
+
+input UpdateUserInput {
+  user_id: String!
+  email: String
+  name_first: String
+  name_last: String
+  password: String
+  organization: String
+  phone: String
+}
+# graphql-scalar
+scalar DateTime
+scalar Time
+scalar Timezone
+############################################
+# Content
+############################################
+
+type Content implements Viewable
+{
+  view_type             : ViewType!            # Viewable
+  id                    : ID!
+  title                 : String
+  short_title           : String
+  last_modified         : String!
+  created_on            : String    # Opt: interleaved AP has no created_on
+  gallery_image_id      : String!
+  tag_list              : [String]!
+  owner_id              : String!
+  published_by_name     : String!
+  description           : String!
+  usage_label           : UsageLabel!
+  content_type          : ContentType!
+  external_content_data : ExternalContentData!
+  meta_searchable       : Searchable
+  meta_favoritable      : Favoritable
+  meta_lockable         : Lockable
+  popularity            : Float
+  grade_level           : Int
+  content_silos         : [String]  # WOOTMATH, SAGA, etc... null implies WOOTMATH
+}
+
+
+# application specific content type
+enum ContentType {
+  ADAPTIVE_TUTOR
+  REAL_TIME_POLLS
+  MATH_JAM
+}
+
+type ExternalContentData {
+  content_id            : ID!
+  owner_id              : ID!
+  app_data              : AppContentData!
+}
+
+input RefetchExternalContentDataInput {
+  content_id   : ID!
+  content_type : ContentType!
+}
+
+# application specific content data
+union AppContentData = RTPContentData | APContentData
+
+type RTPContentData {
+  poll_id:    String!
+  staff_pick: Boolean
+  mdval:      Int
+}
+
+# book_name (not id) is in the CMS, so we'll stick with that, e.g. rational_numbers_intro_1, frac_refresh_3
+type APContentData {
+  # Required to start the app at the right place:
+  wma_version                       : String!
+  book_name                         : String!
+  # Required to display the content
+  book_character                    : String!
+  book_title                        : String!
+  grade_level                       : String!
+}
+
+# usage modality
+enum UsageLabel {
+  WARMUP
+  EXIT_TICKET
+  CLASS_DISCUSSION
+  QUIZ
+  HOMEWORK
+  LEGACY
+  AP_BOOK
+  TEAM_ACTIVITY
+}
+
+input CreateContentFromAPInput {
+  wma_version           : String!
+  book_name             : String!
+  book_character        : String!
+  book_title            : String!
+  grade_level           : String!
+}
+
+type CreateContentPayload {
+  id            : ID
+  title         : String
+}
+
+input UpdateContentPopularityInput {
+  content_data          : [ContentPopularityData]!
+}
+
+input ContentPopularityData {
+  content_id            : ID!
+  external_content_id   : String!
+}
+
+type UpdateContentPopularityPayload {
+  success           : Boolean!
+}
+
+type PaginatedContent {
+  has_next          : Boolean!
+  content           : [Content]!
+}
+
+input RTPExternalContentDataInput {
+  content_id                : ID!
+  owner_id                  : ID!
+  app_data                  : RTPAppContentDataInput
+}
+
+input RTPAppContentDataInput {
+  poll_id                   : String!
+}
+
+############################################
+# Content Instance Data
+############################################
+
+type ContentInstance implements Viewable
+{
+  id                      : ID!
+  usage_label             : UsageLabel!
+  gallery_image_id        : String!
+  tag_list                : [String]!
+  title                   : String
+  view_type               : ViewType!
+  content_type            : ContentType!
+  published_by_name       : String!
+  teacher_id              : String!
+  course_provider         : CourseProvider!
+  section_id              : String!
+  external_instance_data  : ExternalInstanceData!
+  content_silos           : [String]
+}
+
+type RTPInstanceData {
+  instance_id     : String!
+}
+
+type APInstanceData {
+  wma_version     : String!
+  book_name       : String!
+  book_character  : String!
+  book_title      : String!
+  grade_level     : String!
+}
+
+union ExternalInstanceData = RTPInstanceData | APInstanceData
+
+input RefetchContentInstanceInput {
+  teacher_id            : String!
+  course_provider       : CourseProvider!
+  section_id            : String!
+  content_id            : ID!
+  content_type          : ContentType!
+  instance_id           : ID
+  external_instance_id  : ID
+}
+
+############################################
+# Queries
+############################################
+
+extend type Query
+{
+  # content
+  all_content(with_details:Boolean, limit: Int, offset: Int): PaginatedContent
+  content_by_content_silo(content_silos:[String]!, limit: Int, offset: Int): PaginatedContent
+  my_content(user_id: ID!, with_details:Boolean, limit: Int, offset: Int): PaginatedContent
+  my_favorite_content(user_id: ID!, with_details:Boolean, limit: Int, offset: Int): PaginatedContent
+  # "Decorated" means favs / unlockable state populated per user_id, but it's not required
+  decorated_public_content(user_id: ID, gallery_flags:GalleryFlags, limit: Int, offset: Int): PaginatedContent
+  my_premium_content(user_id: ID!, with_details:Boolean, limit: Int, offset: Int, sort_by_lock_state: Boolean, active_content_only: Boolean): PaginatedContent
+  external_content_ids_by_content_type(content_types:[ContentType]!): [Content]
+  content_by_external_content_id(content_type:ContentType, external_content_id:ID): Content
+  content_by_ids(content_ids: [String!]!): [Content]!
+}
+
+
+fragment CommonAPContentData on APContentData {
+  wma_version
+  book_name
+  book_character
+  book_title
+  grade_level
+}
+
+fragment CommonAPInstanceData on APInstanceData {
+  wma_version
+  book_name
+  book_character
+  book_title
+}
+
+
+##################################
+## Fragments on content queries
+##################################
+
+fragment CommonContentExtData on Content {
+  external_content_data {
+    content_id
+    owner_id
+    app_data {
+      ...on RTPContentData {
+        poll_id
+        staff_pick
+        mdval
+      }
+      ...on APContentData { ...CommonAPContentData }
+    }
+  }
+}
+
+# This one is used by the Riot content views as their opts type
+fragment CommonContentFields on Content {
+  # Basic fields
+  id
+  title
+  short_title
+  last_modified
+  usage_label
+  gallery_image_id
+  published_by_name
+  content_type
+  content_silos
+  created_on
+
+  # Include common ExtData
+  ...CommonContentExtData
+
+  # Where should we put these?
+  meta_lockable {
+    state
+  }
+
+  meta_favoritable {
+    favorite_count
+    user_favorite
+  }
+
+  meta_searchable { # Displayed by the slug view...
+    tag_list
+  }
+}
+
+query AllContent($limit: Int, $offset: Int) {
+  all_content(limit: $limit, offset: $offset) {
+    has_next
+    content {
+      ...CommonContentFields
+    }
+  }
+}
+
+query ContentByContentSilo($content_silos: [String]!, $limit: Int, $offset: Int) {
+  content_by_content_silo(content_silos: $content_silos, limit: $limit, offset: $offset) {
+    has_next
+    content {
+      ...CommonContentFields
+    }
+  }
+}
+
+query MyContent($user_id: ID!, $limit: Int, $offset: Int) {
+  my_content(user_id: $user_id, limit: $limit, offset: $offset) {
+    has_next
+    content {
+      ...CommonContentFields
+    }
+  }
+}
+
+query MyFavoriteContent($user_id: ID!, $limit: Int, $offset: Int) {
+  my_favorite_content(user_id: $user_id, limit: $limit, offset: $offset) {
+    has_next
+    content {
+      ...CommonContentFields
+    }
+  }
+}
+
+query DecoratedPublicContent($user_id: ID, $gallery_flags: GalleryFlags, $limit: Int, $offset: Int) {
+  decorated_public_content(user_id: $user_id, gallery_flags: $gallery_flags, limit: $limit, offset: $offset) {
+    has_next
+    content {
+      ...CommonContentFields
+    }
+  }
+}
+
+query MyPremiumContent($user_id: ID!, $limit: Int, $offset: Int, $sort_by_lock_state: Boolean, $active_content_only: Boolean) {
+  my_premium_content(user_id: $user_id, limit: $limit, offset: $offset, sort_by_lock_state: $sort_by_lock_state, active_content_only: $active_content_only) {
+    has_next
+    content {
+      ...CommonContentFields
+    }
+  }
+}
+
+query GetExternalContentIDsByContentType($content_types: [ContentType]!) {
+  external_content_ids_by_content_type(content_types: $content_types) {
+    id
+    external_content_data {
+      content_id
+    }
+  }
+}
+
+query GetContentByExternalContentID($content_type:ContentType, $external_content_id:ID) {
+  content_by_external_content_id(content_type:$content_type, external_content_id:$external_content_id) {
+    ...CommonContentFields
+  }
+}
+
+# TODO: Adam, you might need a different fragment setup for search. Let's talk...
+query SearchContent($search_terms: [SearchFacet!]!, $gallery_flags: GalleryFlags, $teacher_id: String, $owner_id: String, $limit: Int, $offset: Int) {
+  search_content(search_terms: $search_terms, gallery_flags: $gallery_flags, teacher_id: $teacher_id, owner_id: $owner_id, limit: $limit, offset: $offset) {
+    has_next
+    content {
+      ...CommonContentFields
+    }
+  }
+}
+
+query SearchUnselectedTerms($search_terms: [SearchFacet!]!, $gallery_flags: GalleryFlags, $unselected_terms: [SearchFacet!]!, $teacher_id: String, $owner_id: String) {
+  search_unselected_terms(search_terms: $search_terms, gallery_flags: $gallery_flags, unselected_terms: $unselected_terms, teacher_id: $teacher_id, owner_id: $owner_id) {
+    counts
+  }
+}
+
+query SearchTypeahead($query: String!) {
+  search_typeahead(query: $query) {
+    suggestions
+  }
+}
+
+query GetContentByIDs($content_ids: [String!]!) {
+  content_by_ids(content_ids: $content_ids) {
+    ...CommonContentFields
+  }
+}
+
+############################################
+# Mutations
+############################################
+
+extend type Mutation {
+  # single typed input and typed payload,
+  # see https://dev-blog.apollodata.com/designing-graphql-mutations-e09de826ed97
+  create_content_from_ap(input: CreateContentFromAPInput!):CreateContentPayload
+  # delete_content(input: DeleteContentInput!):DeleteContentPayload
+  refetch_external_content_data(input: RefetchExternalContentDataInput!):RefetchPayload
+  update_content_popularity(input: UpdateContentPopularityInput!):UpdateContentPopularityPayload
+  # Bug Scrub 9/21
+  add_active_premium_content(input: AddActivePremiumContentInput!):StatusPayload
+  # content instance (instance data)
+  refetch_content_instance(input: RefetchContentInstanceInput!):RefetchPayload
+}
+
+
+mutation RefetchExternalContentData($input: RefetchExternalContentDataInput!) {
+  refetch_external_content_data(input: $input) {
+    success
+    id
+    operation
+  }
+}
+
+mutation RefetchContentInstance($input: RefetchContentInstanceInput!) {
+  refetch_content_instance(input: $input) {
+    success
+    id
+    operation
+  }
+}
+
+mutation UpdateContentPopularity($input: UpdateContentPopularityInput!) {
+  update_content_popularity(input: $input) {
+    success
+  }
+}
+
+mutation CreateContentFromAP($input: CreateContentFromAPInput!) {
+  create_content_from_ap(input: $input) {
+    id
+    title
+  }
+}
+
+# Bug Scrub 9/21
+mutation AddActivePremiumContent($input: AddActivePremiumContentInput!) {
+  add_active_premium_content(input: $input) {
+    success
+  }
+}
+
+# Bug Scrub 9/21
+input AddActivePremiumContentInput {
+  teacher_id        : String!
+  content_id        : ID!
+}
+enum AuthnProvider {
+  WOOTMATH
+  GOOGLE
+  CLEVER
+  LTI
+  ANONYMOUS
+}
+
+enum AuthzProvider {
+  GOOGLE
+  CLEVER
+}
+
+type ExternAuthn {
+  id: String!
+  authn_provider:AuthnProvider!
+}
+
+########################################################
+# Saga Connect auth - via their own email / password, or
+########################################################
+type SCATPInfo {
+  id   : String!,
+  name : String!
+}
+union SCAuthType = SCATPhone | SCATEmail | SCATParent | SCATTeacher
+type SCATEmail {
+  id       : String!
+  by_email : Boolean!
+}
+type SCATPhone {
+  id       : String!
+  by_phone : Boolean!
+}
+type SCATParent {
+  id        : String!
+  by_parent : Boolean!
+  info      : [SCATPInfo]!
+}
+type SCATTeacher {
+  teacher_id : String!
+  by_teacher : Boolean!
+}
+
+type StudentPII {
+  student_id: String!
+  email: String
+  phone: String
+}
+
+extend type Query
+{
+  check_saga_connect_auth_step1(step1: String!): SCAuthType
+  swap_parent_for_student_auth(student_id: String!): StatusPayload
+  student_pii(student_id: String!): StudentPII!
+}
+
+query CheckSagaConnectAuthStep1($step1: String!) {
+  check_saga_connect_auth_step1(step1: $step1) {
+    ...on SCATPhone { id, by_phone }
+    ...on SCATEmail { id, by_email }
+    ...on SCATParent { by_parent, info { id, name } }
+    ...on SCATTeacher { by_teacher, teacher_id }
+  }
+}
+
+query SwapParentForStudentAuth($student_id: String!) {
+  swap_parent_for_student_auth(student_id: $student_id) {
+    success
+  }
+}
+
+query GetStudentPII($student_id: String!) {
+  student_pii(student_id: $student_id) {
+    student_id
+    email
+    phone
+  }
+}
+###########################################
+# Admin Schema
+############################################
+
+type Admin {
+  admin_id             : String!
+  teacher_id           : String!
+  admin_role           : AdminRole!
+  districts            : [String]
+  schools              : [String]
+  teachers             : [String]
+}
+
+enum AdminRole {
+  ACCOUNT_MANAGEMENT
+  DATA_REVIEW
+  CO_TEACHER
+  TUTOR_ADMIN
+  SUPERVISOR
+  MANAGER
+  DIRECTOR
+}
+
+type School {
+  school_id            : String!
+  name                 : String!
+  teachers             : [Teacher]!
+}
+
+type Teacher {
+  teacher_id           : String!
+  username             : String!
+  email                : String!
+  sections             : [Roster]
+  name_first           : String!
+  name_last            : String!
+  school_id            : String
+  password             : String
+}
+
+input AddTeacherToAdminInput {
+  admin_id             : String!
+  teacher_id           : String!
+  nces_school_number   : String
+}
+
+input RemoveTeacherFromAdminInput {
+  admin_id             : String!
+  teacher_id           : String!
+}
+
+type ModifyAdminTeacherPayload {
+  operation            : ModifyAdminTeacherOperation!
+  success              : Boolean!
+  message              : String
+  error_code           : String
+}
+
+enum ModifyAdminTeacherOperation {
+  ADD
+  REMOVE
+}
+
+input CreateTeacherAccountInput {
+  admin_id             : String!
+  email                : String!
+  name_first           : String!
+  name_last            : String!
+  password             : String!
+  nces_school_number   : String!
+}
+
+type CreateTeacherAccountPayload {
+  success              : Boolean!
+  teacher_id           : String
+  site_code            : String
+  error_code           : String
+}
+
+input UpdateTeacherAccountInput {
+  teacher_id           : String!
+  admin_id             : String!
+  username             : String
+  email                : String
+  name_first           : String
+  name_last            : String
+  password             : String
+  nces_school_number   : String
+}
+
+type UpdateTeacherAccountPayload {
+  success              : Boolean!
+  email                : String
+  username             : String
+  name_first           : String
+  name_last            : String
+  error_code           : String
+}
+
+input CreateAdminInput {
+  admin_role           : AdminRole!
+  teacher_id           : String
+  email                : String
+  name_first           : String
+  name_last            : String
+  password             : String
+}
+
+input UpdateAdminRoleInput {
+  teacher_id           : String!
+  admin_role           : AdminRole!
+}
+
+input RemoveAdminRoleInput {
+  teacher_id           : String!
+}
+
+############################################
+# Queries and Mutations
+############################################
+
+extend type Query {
+  get_schools_by_admin_id(admin_id: String!, school_ids: [String], teacher_ids: [String], section_ids: [String] ):[School]!
+  is_admin(teacher_id: String!):Boolean!
+  has_admin_role(teacher_id: String!, admin_role:AdminRole!):Boolean!
+  has_admin_roles(teacher_id: String!, admin_roles:[AdminRole]!):Boolean!
+  has_admin_organization(teacher_id: String!):Boolean!
+  admin_details(teacher_id: String!):Admin!
+  admin_details_by_email(email: String!):Admin!
+  contact_admin(teacher_id: String!, message: String!): StatusWithErrorsPayload!
+  teacher_id_by_email(email: String!): String
+  teacher_email_by_id(teacher_id: String!): String
+}
+
+query IsAdmin($teacher_id: String!) {
+  is_admin(teacher_id: $teacher_id)
+}
+
+query HasAdminRole($teacher_id: String!, $admin_role:AdminRole!) {
+  has_admin_role(teacher_id: $teacher_id, admin_role: $admin_role)
+}
+
+query HasAdminRoles($teacher_id: String!, $admin_roles:[AdminRole]!) {
+  has_admin_roles(teacher_id: $teacher_id, admin_roles: $admin_roles)
+}
+
+query HasAdminOrganization($teacher_id: String!) {
+  has_admin_organization(teacher_id: $teacher_id)
+}
+
+fragment AdminFields on Admin {
+  admin_id
+  teacher_id
+  admin_role
+  districts
+  schools
+  teachers
+}
+
+query GetAdminDetails($teacher_id: String!) {
+  admin_details(teacher_id: $teacher_id) {
+    ...AdminFields
+  }
+}
+
+query GetAdminDetailsByEmail($email: String!) {
+  admin_details_by_email(email: $email) {
+    ...AdminFields
+  }
+}
+
+query GetSchoolsByAdminID($admin_id: String!, $school_ids: [String], $teacher_ids: [String], $section_ids: [String]) {
+  get_schools_by_admin_id(admin_id: $admin_id, school_ids: $school_ids, teacher_ids: $teacher_ids, section_ids:$section_ids) {
+    school_id
+    name
+    teachers {
+      username
+      teacher_id
+      email
+      name_first
+      name_last
+      school_id
+      sections {
+        course_provider
+        section_name
+        section_id
+        grade
+        students {
+          username
+          student_id
+          name_last
+          name_first
+          grade
+          extern_authn {
+            id
+            authn_provider
+          }
+        }
+      }
+    }
+  }
+}
+
+query ContactAdmin($teacher_id: String!, $message: String!) {
+  contact_admin(teacher_id: $teacher_id, message: $message) {
+    success
+    errors
+  }
+}
+
+query GetTeacherIDByEmail($email: String!) {
+  teacher_id_by_email(email: $email)
+}
+
+query GetTeacherEmailByID($teacher_id: String!) {
+  teacher_email_by_id(teacher_id: $teacher_id)
+}
+
+extend type Mutation {
+  add_teacher_to_admin(input: AddTeacherToAdminInput!):ModifyAdminTeacherPayload!
+  remove_teacher_from_admin(input: RemoveTeacherFromAdminInput!):ModifyAdminTeacherPayload!
+  create_teacher_account(input: CreateTeacherAccountInput!):CreateTeacherAccountPayload!
+  update_teacher_account(input: UpdateTeacherAccountInput!):UpdateTeacherAccountPayload!
+  create_admin(input: CreateAdminInput!): StatusIDPayload!
+  update_admin_role(input: UpdateAdminRoleInput!): StatusPayload!
+  remove_admin_role(input: RemoveAdminRoleInput!): StatusPayload!
+}
+
+mutation AddTeacherToAdmin($input: AddTeacherToAdminInput!) {
+  add_teacher_to_admin(input: $input) {
+    operation
+    success
+    message
+    error_code
+  }
+}
+
+mutation RemoveTeacherFromAdmin($input: RemoveTeacherFromAdminInput!) {
+  remove_teacher_from_admin(input: $input) {
+    operation
+    success
+    message
+    error_code
+  }
+}
+
+mutation CreateTeacherAccount($input: CreateTeacherAccountInput!) {
+  create_teacher_account(input: $input) {
+    success
+    teacher_id
+    site_code,
+    error_code
+  }
+}
+
+mutation UpdateTeacherAccount($input: UpdateTeacherAccountInput!) {
+  update_teacher_account(input: $input) {
+    success
+    email
+    name_first
+    name_last
+    error_code
+  }
+}
+
+mutation CreateAdmin($input: CreateAdminInput!) {
+  create_admin(input: $input) {
+    success
+    id
+  }
+}
+
+mutation UpdateAdminRole($input: UpdateAdminRoleInput!) {
+  update_admin_role(input: $input) {
+    success
+  }
+}
+
+mutation RemoveAdminRole($input: RemoveAdminRoleInput!) {
+  remove_admin_role(input: $input) {
+    success
+  }
+}
+############################################
+# Favoritable Decorator
+############################################
+
+type Favoritable {
+  favorite_count             : Int!
+  user_favorite                : Boolean!
+}
+
+input FavoriteContentInput {
+  user_id               : String!
+  content_id            : ID!
+}
+
+type FavoriteContentPayload {
+  is_now_fav  : Boolean
+  ae_rids     : [String]
+}
+
+
+############################################
+# Mutations
+############################################
+
+extend type Mutation
+{
+  toggle_favorite_content(input: FavoriteContentInput!):FavoriteContentPayload
+}
+
+mutation ToggleFavoriteContent($input: FavoriteContentInput!) {
+  toggle_favorite_content(input: $input) {
+    is_now_fav
+    ae_rids
+  }
+}
+############################################
+# Lockable Decorator
+############################################
+
+type Lockable {
+  state :LockState!
+}
+
+enum LockState {
+  LOCKED
+  UNLOCKED
+}
+###########################################
+# Roster Schema
+############################################
+
+type Roster {
+  course_provider    : CourseProvider!
+  section_name       : String!
+  section_id         : String!
+  grade              : String
+  students           : [Student]
+  sis_id             : String # optional Clever param
+}
+
+type Student {
+  username           : String!
+  student_id         : String!
+  name_first         : String
+  name_last          : String
+  grade              : String
+  # ExternalAuthn from auth.gql -- ToDo  : require this field after routes are baked
+  extern_authn       : ExternAuthn
+}
+
+input CreateSectionInput {
+  teacher_id         : String!
+  section_name       : String!
+  grade              : String!
+  admin_id           : String # Only needed if action performed by an admin
+}
+
+type CreateSectionPayload {
+  success            : Boolean!
+  section_id         : String
+  message            : String
+  error_code         : String
+}
+
+input UpdateSectionInput {
+  teacher_id         : String!
+  section_id         : String!
+  operation          : UpdateOperation!
+  section_name       : String!
+  grade              : String
+  admin_id           : String # Only needed if action performed by an admin
+}
+
+type UpdateSectionPayload {
+  success            : Boolean!
+  message            : String
+  error_code         : String
+}
+
+enum UpdateOperation {
+  UPDATE
+  DELETE
+  ARCHIVE
+}
+
+input CreateStudentInSectionInput {
+  section_id         : String!
+  teacher_id         : String!
+  username           : String!
+  password           : String!
+  name_first         : String
+  last_initial       : String
+  grade              : String
+  admin_id           : String # Only needed if action performed by an admin
+}
+
+type CreateStudentInSectionPayload {
+  success            : Boolean!
+  student_id         : String
+  message            : String
+  error_code         : String
+}
+
+input DeleteStudentFromSectionInput {
+  student_id         : String!
+  section_id         : String!
+  teacher_id         : String!
+  admin_id           : String # Only needed if action performed by an admin
+}
+
+type DeleteStudentFromSectionPayload {
+  success            : Boolean!
+  student_id         : String
+  message            : String
+  error_code         : String
+}
+
+input MoveStudentSectionInput {
+  student_id         : String!
+  from_section_id    : String!
+  to_section_id      : String!
+  teacher_id         : String
+  admin_id           : String # Only needed if action performed by an admin
+}
+
+type MoveStudentSectionPayload {
+  success            : Boolean!
+  student_id         : String!
+  message            : String
+  error_code         : String
+}
+
+input UpdateStudentSettingsInput {
+  student_id         : String!
+  teacher_id         : String!
+  section_id         : String
+  username           : String
+  password           : String
+  name_first         : String
+  last_initial       : String
+  grade              : String
+  admin_id           : String # Only needed if action performed by an admin
+  email              : String
+  phone              : String
+}
+
+type UpdateStudentSettingsPayload {
+  success            : Boolean!
+  student_id         : String
+  username           : String
+  message            : String
+  error_code         : String
+}
+
+input CSVRosterInput {
+  admin_id           : String!
+  schools            : [CSVRosterSchoolInput]!
+}
+
+input CSVRosterSchoolInput {
+  nces_school_number : String!
+  teachers           : [CSVRosterTeacherInput]!
+}
+
+input CSVRosterTeacherInput {
+  email              : String!
+  sections           : [CSVRosterSectionInput]!
+  username           : String
+  name_first         : String
+  name_last          : String
+  password           : String
+}
+
+input CSVRosterSectionInput {
+  section_name       : String!
+  students           : [CSVRosterStudentInput]!
+  grade              : String
+}
+
+input CSVRosterStudentInput {
+  username           : String!
+  password           : String
+  name_first         : String
+  last_initial       : String
+  grade              : String
+}
+
+type ValidateCSVRosterPayload {
+  is_valid           : Boolean!
+  errors             : [String]!
+}
+
+type ProcessCSVRosterPayload {
+  result             : ProcessCSVRosterResult!
+  inserted_teachers  : [Teacher]
+  inserted_sections  : [Roster]
+  inserted_students  : [Student]
+  updated_teachers   : [Teacher]
+  updated_sections   : [Roster]
+  updated_students   : [Student]
+  errors             : [String]
+}
+
+enum ProcessCSVRosterResult {
+  SUCCESS
+  PARTIAL
+  FAILURE
+}
+
+enum CourseProvider {
+  WOOTMATH
+  CLEVER
+  LTI
+  GOOGLE
+  ANONYMOUS
+}
+
+############################################
+# Queries and Mutations
+############################################
+
+extend type Query
+{
+  get_roster_by_section_id(section_id: String!, teacher_id: String!, course_provider:CourseProvider!):Roster
+  get_rosters_by_teacher_id(teacher_id: String!):[Roster]
+  get_section_ids_by_teacher_id(teacher_id: String!):[String]
+  # need to provide roster data to bill or ask Jeff to provide from login
+  # get_roster_by_assignment_id(aid:String!)
+}
+
+query GetSectionIDsByTeacherID($teacher_id: String!) {
+  get_section_ids_by_teacher_id(teacher_id: $teacher_id)
+}
+
+fragment CommonRosterData on Roster {
+  section_id
+  course_provider
+  section_name
+  grade
+  students {
+    username
+    student_id
+    extern_authn {
+      id
+      authn_provider
+    }
+  }
+  sis_id
+}
+
+query GetRosterBySectionID($section_id: String!, $teacher_id: String!, $course_provider: CourseProvider!) {
+  get_roster_by_section_id(section_id: $section_id, teacher_id: $teacher_id, course_provider: $course_provider) {
+    ...CommonRosterData
+    students {
+      username
+      student_id
+      extern_authn {
+        id
+        authn_provider
+      }
+    }
+  }
+}
+
+query GetRostersByTeacherID($teacher_id: String!) {
+  get_rosters_by_teacher_id(teacher_id: $teacher_id) {
+    ...CommonRosterData
+  }
+}
+
+extend type Mutation
+{
+  create_section(input: CreateSectionInput!): CreateSectionPayload,
+  update_section(input: UpdateSectionInput!): UpdateSectionPayload,
+  create_student_in_section(input: CreateStudentInSectionInput!):CreateStudentInSectionPayload,
+  delete_student_from_section(input: DeleteStudentFromSectionInput!):DeleteStudentFromSectionPayload
+  move_student_section(input: MoveStudentSectionInput!):MoveStudentSectionPayload!,
+  update_student_settings(input: UpdateStudentSettingsInput!): UpdateStudentSettingsPayload
+  validate_csv_roster(input: CSVRosterInput!): ValidateCSVRosterPayload
+  process_csv_roster(input: CSVRosterInput!): ProcessCSVRosterPayload
+}
+
+mutation CreateSection($input: CreateSectionInput!) {
+  create_section(input: $input) {
+    success
+    section_id
+    message
+    error_code
+  }
+}
+
+mutation UpdateSection($input: UpdateSectionInput!) {
+  update_section(input: $input) {
+    success
+    message
+    error_code
+  }
+}
+
+mutation CreateStudentInSection($input: CreateStudentInSectionInput!) {
+  create_student_in_section(input: $input) {
+    success
+    student_id
+    message
+    error_code
+  }
+}
+
+mutation DeleteStudentFromSection($input: DeleteStudentFromSectionInput!) {
+  delete_student_from_section(input: $input) {
+    success
+    student_id
+    message
+    error_code
+  }
+}
+
+mutation MoveStudentSection($input: MoveStudentSectionInput!) {
+  move_student_section(input: $input) {
+    success
+    student_id
+    message
+    error_code
+  }
+}
+
+mutation UpdateStudentSettings($input: UpdateStudentSettingsInput!) {
+  update_student_settings(input: $input) {
+    success
+    student_id
+    username
+    message
+    error_code
+  }
+}
+
+mutation ValidateCSVRoster($input: CSVRosterInput!) {
+  validate_csv_roster(input: $input) {
+    is_valid
+    errors
+  }
+}
+
+mutation ProcessCSVRoster($input: CSVRosterInput!) {
+  process_csv_roster(input: $input) {
+    result
+    inserted_teachers {
+      teacher_id
+      username
+      email
+      name_first
+      name_last
+    }
+    inserted_sections {
+      course_provider
+      section_name
+      section_id
+      grade
+    }
+    inserted_students {
+      username
+      student_id
+      name_first
+      name_last
+      grade
+      extern_authn {
+        id
+        authn_provider
+      }
+    }
+    updated_teachers {
+      teacher_id
+      username
+      email
+      name_first
+      name_last
+    }
+    updated_sections {
+      course_provider
+      section_name
+      section_id
+      grade
+    }
+    updated_students {
+      username
+      student_id
+      name_first
+      name_last
+      grade
+      extern_authn {
+        id
+        authn_provider
+      }
+    }
+    errors
+  }
+}
+
+############################################
+# Searchable Decorator
+############################################
+
+type Searchable {
+  id                  : ID!
+  content_type        : ContentType!
+  description         : String
+  parent_id           : ID!
+  published_by_name   : String!
+  tag_list            : [String]!
+  owner_id            : String!
+  owner_name          : String!
+  sharing             : SharingType!
+  title               : String
+  view_type           : ViewType!
+  last_modified       : String!
+  question_count      : Int
+}
+
+enum SharingType {
+  PUBLIC
+  PRIVATE
+  AWAITING_MODERATION
+  DENIED
+  SILOED
+}
+
+ input RTPSearchableInput {
+  question_count        : Int
+  sharing               : SharingType
+}
+
+enum GFSort {
+  DEFAULT
+  AWS
+  AVERAGE
+  NEWEST
+  OLDEST
+}
+
+enum SearchFacetCategory { # a subset of user_website_data.FacetCategory
+  SEARCH_TERM
+  GRADE
+  DOMAIN
+  SUBJECT
+  QUESTION_COUNT
+}
+
+input SearchFacet {   # a subset of user_website_data.Facet
+  id       : String   # sometimes passed in, not used on the server side
+  category : SearchFacetCategory!
+  terms    : [String!]!
+  title    : String   # sometimes passed in, not used on the server side
+}
+
+input GalleryFlags {
+  no_deduplication     : Boolean
+  sort                 : GFSort
+  grade_post_weighting : [Int]
+  no_grade_tweaks      : Boolean
+  no_unselected_terms  : Boolean  # aka no tag lookahead
+  no_auto_quoting      : Boolean
+  aws_min_rel          : Float    # 0.0 == disabled, 0.2 default, don't go >1.0
+}
+
+scalar CountsType # Dynammic object: { [term_id]: count, ... }
+
+type TermCounts {
+  counts : CountsType
+}
+
+type TypeaheadSuggestions {
+  suggestions : [String]
+}
+
+
+############################################
+# Queries and Mutations
+############################################
+
+extend type Query
+{
+  search_content(search_terms: [SearchFacet!]!, gallery_flags: GalleryFlags, teacher_id: String, owner_id: String, limit: Int, offset: Int): PaginatedContent
+  search_unselected_terms(search_terms: [SearchFacet!]!, gallery_flags: GalleryFlags, unselected_terms: [SearchFacet!]!, teacher_id: String, owner_id: String): TermCounts
+  search_typeahead(query: String!): TypeaheadSuggestions
+}
+############################################
+# Viewable interface
+############################################
+
+interface Viewable {
+  view_type             : ViewType!
+}
+
+enum ViewType {
+  CONTENT
+  ASSIGNMENT
+  PRACTICE
+  CONFERENCE
+  STUDENT_ASSIGNMENT
+  STUDENT_PRACTICE
+  STUDENT_CONFERENCE
+  HOMEWORK_HELP
+}
+
+union AppViewable = APStudentViewable | RTPStudentViewable
+
+type APStudentViewable {
+  book_title: String!
+  book_characther: String!
+}
+
+type RTPStudentViewable {
+  title: String!
+}
+
+interface StudentViewable {
+  view_type: ViewType!
+  app_view : AppViewable!
+}
+
+
+
+###################
+# Fragments
+###################
+
+###################
+# Queries
+###################
+
+query CMSAlive($dummy: String!) {
+  cms_alive(dummy: $dummy) {
+    success
+  }
+}
+
+query CmsResolver($dummy:String!) {
+  cms_resolver(dummy:$dummy) {
+    success
+    msg
+  }
+}
+
+
+###################
+# Fragments
+###################
+
+###################
+# Queries
+###################
 
 query GetContentModuleById($id: ID!) {
   content_module_by_id(id: $id) {
@@ -31,6 +1628,51 @@ query GetContentModuleById($id: ID!) {
     ... on PollModule {
       content_type
       poll_id
+    }
+  }
+}
+
+
+# Descriptions: Ops for LearnGalleryContentController.hx
+
+###################
+# Fragments
+###################
+
+fragment SLContentFields on Content {
+  id
+  title
+  short_title
+  last_modified
+  usage_label
+  gallery_image_id
+  published_by_name
+  content_type
+  content_silos
+  created_on
+  ...CommonContentExtData
+}
+
+###################
+# Queries
+###################
+
+query GetContentSiloFilters($content_silo: String!) {
+  content_silo_filters(content_silo: $content_silo) {
+    content_silo
+    subjects {
+      name
+      tags
+      filters
+    }
+  }
+}
+
+query GetContentBySearchArgs($input: ContentSearchArgs!) {
+  content_by_search_args(input: $input) {
+    has_next
+    content {
+      ...SLContentFields
     }
   }
 }

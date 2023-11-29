@@ -1,0 +1,7 @@
+---
+name: gql2hx
+build_ver: BW2
+builder: ShellCmdBuilder
+type: in-house
+steps:
+  - cmd: npm run-script build
