@@ -1004,9 +1004,7 @@ class GQLTypeTools
         } else {
           generate_union(tname, type_paths, types_by_name, writer);
         }
-        var rval = writer.toString();
-        trace(rval);
-        return rval;
+        return writer.toString();
     }
   }
 
@@ -1038,7 +1036,6 @@ class GQLTypeTools
     }';
     var as_enum_template = new haxe.Template(as_enum_template_str);
     var as_enum_str = as_enum_template.execute({paths:paths, tname:tname});
-    trace(as_enum_str);
     writer.append(as_enum_str);
     writer.append('}');
   }
