@@ -29,11 +29,16 @@ class Test
     trace('============================================================');
     trace('Generating Haxe:');
     trace('============================================================');
-    var result = graphql.HaxeGenerator.parse(p.document);
-    if (result.stderr.length>0) {
-      trace('Error:\n${ result.stderr }');
-    } else {
-      trace(result.stdout);
+    try {
+      var result = graphql.HaxeGenerator.parse(p.document);
+      if (result.stderr.length>0) {
+        trace('Error:\n${ result.stderr }');
+      } else {
+        trace(result.stdout);
+      }
+    } catch (e:Dynamic) {
+      trace('Error parsing:');
+      trace(e);
     }
     trace('============================================================');
     trace('============================================================');

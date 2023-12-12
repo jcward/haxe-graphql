@@ -512,9 +512,15 @@ class HaxeGenerator
           case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
             error('${ err_prefix }Expecting type ${ tname } to have field ${ name }!', true);
           case TStruct(tname, fields):
-            var field = fields[name];
-            if (field==null) error('${ err_prefix }Expecting type ${ tname } to have field ${ name }!', true);
-            if (path.length==0) {
+          var field:GQLFieldType;
+          // Issue 43 - support __typename instrinsic
+          if(name == '__typename') {
+            field =  { type:TPath('String'), is_array:false, is_optional:true };
+          } else {
+            field = fields[name];
+          }
+          if (field==null) error('${ err_prefix }Expecting type ${ tname } to have field ${ name }!', true);
+          if (path.length==0) {
               resolve_type(field.type, err_prefix);
               return field;
             }
@@ -764,7 +770,6 @@ class HaxeGenerator
           next_type_path.push(name);
           var resolved = resolve_field(next_type_path, gt_info);
           var type = resolve_type(resolved.type);
-  
           switch type {
             case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
               if (has_sub_selections) {
@@ -776,14 +781,17 @@ class HaxeGenerator
                 error('Must specify sub-fields of ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }', true);
               }
               if (is_union(tname)) {
-                if (field_node.selectionSet.selections.find(function(sn) return sn.kind==Kind.FIELD)!=null) {
+                if (field_node.selectionSet.selections.find(function(sn) {
+                  // Issue 43 - support __typename instrinsic
+                  return sn.kind==Kind.FIELD && Reflect.field(cast sn, 'name').value!='__typename';
+                })!=null) {
                   error('Can only specify fragment selections of union ${ tname } at ${ type_path.join(".") } of operation ${ gt_info.debug_name }', true);
                 }
               }
 
               var sub_type_name = (depth==0 && StringTools.endsWith(type_name, OP_OUTER_SUFFIX)) ?
                 StringTools.replace(type_name, OP_OUTER_SUFFIX, OP_INNER_SUFFIX) : type_name+DEFAULT_SEPARATOR+name;
-  
+
               var sub_type = generate_type_based_on_selection_set(sub_type_name, gt_info, field_node.selectionSet, tname, depth+1);
               var f = { type:null, is_array:resolved.is_array, is_optional:resolved.is_optional };
               fields[alias] = f;
@@ -809,7 +817,7 @@ class HaxeGenerator
     } else {
       return _types_by_name[type_name];
     }
-    
+
   }
 
   // Per the discussion at https://github.com/facebook/graphql/issues/204, the operation
@@ -876,7 +884,8 @@ abstract ID(String) to String from String {\n  // Relaxed safety -- allow implic
     for (name in _types_by_name.keys()) {
       if (_basic_types.indexOf(name)>=0) continue;
       var type = _types_by_name[name];
-      stdout_writer.append( GQLTypeTools.type_to_string(type) );
+      // Issue #43 - inject type map so we can use __typename for unions
+      stdout_writer.append( GQLTypeTools.type_to_string(type, _types_by_name) );
       stdout_writer.append('');
     }
 
@@ -967,12 +976,11 @@ class GQLTypeTools
         var field = { name:field_name, kind:FVar(ct, null), meta:[], pos:FAKE_POS };
         if (gql_f.is_optional) field.meta.push({ name:":optional", pos:FAKE_POS });
         return field;
-
       case TAnon(any): throw 'Non-struct types are not supported in TAnon: ${ any }';
     }
   }
 
-  public static function type_to_string(td:GQLTypeDefinition):String {
+  public static function type_to_string(td:GQLTypeDefinition, types_by_name:StringMapAA<GQLTypeDefinition>):String {
     var p = new CustomPrinter("  ", true);
     switch td {
       case TBasic(tname): return '';
@@ -991,20 +999,71 @@ class GQLTypeTools
         return p.printTypeDefinition( haxe_td );
       case TUnion(tname, type_paths):
         var writer = new StringWriter();
-        var union_types_note = type_paths.map(function(t) return t).join(" | ");
-        writer.append('/* union '+tname+' = ${ union_types_note } */');
-        writer.append('abstract '+tname+'(Dynamic) {');
-        for (type_name in type_paths) {
-          writer.append(' @:from static inline function from${ type_name }(v:${ type_name }):${ tname } return cast v;');
-          var as_name = type_name;
-          var sep:String = HaxeGenerator.UNION_SELECTION_SEPARATOR;
-          if (as_name.indexOf(sep)>=0) {
-            as_name = as_name.substr(as_name.indexOf(sep)+sep.length);
-          }
-          writer.append(' public inline function as${ HaxeGenerator.DEFAULT_SEPARATOR }${ as_name }():${ type_name } return cast this;');
+        if(union_has_typename(types_by_name, type_paths)) {
+          generate_union_with_typename(tname, type_paths, types_by_name, writer);
+        } else {
+          generate_union(tname, type_paths, types_by_name, writer);
         }
-        writer.append('}');
         return writer.toString();
+    }
+  }
+
+  private static function generate_union_with_typename(tname:String, type_paths:Array<String>, types_by_name:StringMapAA<GQLTypeDefinition>, writer:StringWriter) {
+
+    // Generate the enum definition
+    var enum_vals = type_paths.map(function(type_path) {
+      var name = '${type_path.split("InnerResult_")[1]}';
+      return {name:'${name}(v:${type_path});'};
+    });
+    var union_enum_template_str =
+    'enum ${ tname }Enum {\n::foreach enum_vals::  ::name::\n::end::}';
+    var enum_template = new haxe.Template(union_enum_template_str);
+    var union_enum_str = enum_template.execute({enum_vals:enum_vals});
+    writer.append(union_enum_str);
+    var union_types_note = type_paths.map(function(t) return t).join(" | ");
+    writer.append('/* union '+tname+' = ${ union_types_note } */');
+    writer.append('abstract '+tname+'(Dynamic) {');
+
+    // Generate the tname abstract with the as_enum() method
+    var paths = [];
+    for(i in 0...type_paths.length) {
+      paths.push({index:i, path:type_paths[i], enum_val_name:type_paths[i].split("InnerResult_")[1]});
+    }
+    var as_enum_template_str = ' public function as_enum():::tname::Enum {
+      ::foreach paths::if(StringTools.endsWith("::path::", "ON_"+this.__typename)) { return ::enum_val_name::(this);}
+      ::end::throw "invalid type";
+    }';
+    var as_enum_template = new haxe.Template(as_enum_template_str);
+    var as_enum_str = as_enum_template.execute({paths:paths, tname:tname});
+    writer.append(as_enum_str);
+    writer.append('}');
+  }
+
+  private static function generate_union(tname:String, type_paths:Array<String>, types_by_name:StringMapAA<GQLTypeDefinition>, writer:StringWriter) {
+    var union_types_note = type_paths.map(function(t) return t).join(" | ");
+    writer.append('/* union '+tname+' = ${ union_types_note } */');
+    writer.append('abstract '+tname+'(Dynamic) {');
+    for (type_name in type_paths) {
+      writer.append(' @:from static inline function from${ type_name }(v:${ type_name }):${ tname } return cast v;');
+      var as_name = type_name;
+      var sep:String = HaxeGenerator.UNION_SELECTION_SEPARATOR;
+      if (as_name.indexOf(sep)>=0) {
+        as_name = as_name.substr(as_name.indexOf(sep)+sep.length);
+      }
+      writer.append(' public inline function as${ HaxeGenerator.DEFAULT_SEPARATOR }${ as_name }():${ type_name } return cast this;');
+    }
+    writer.append('}');
+    return writer.toString();
+  }
+
+  private static function union_has_typename(types_by_name:StringMapAA<GQLTypeDefinition>, type_paths:Array<String>) {
+    // __typename on the union is reflected in all the type_paths so we only have to check the first one
+    var union_type = types_by_name[type_paths[0]];
+    switch union_type {
+      case TStruct(name, fields):
+        return fields.exists('__typename');
+      default:
+        return false;
     }
   }
 
