@@ -1,6 +1,6 @@
 {
   "name": "gql2hx",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "description": "Convert GraphQL schema to Haxe definitions",
   "perferGlobal": true,
   "license": "MIT",
