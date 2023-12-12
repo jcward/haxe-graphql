@@ -1030,8 +1030,7 @@ class GQLTypeTools
       paths.push({index:i, path:type_paths[i], enum_val_name:type_paths[i].split("InnerResult_")[1]});
     }
     var as_enum_template_str = ' public function as_enum():::tname::Enum {
-      var re = new EReg(this.__typename, "");
-      ::foreach paths::if(re.match("::path::")) { return ::enum_val_name::(this);}
+      ::foreach paths::if(StringTools.endsWith("::path::", "ON_"+this.__typename)) { return ::enum_val_name::(this);}
       ::end::throw "invalid type";
     }';
     var as_enum_template = new haxe.Template(as_enum_template_str);
