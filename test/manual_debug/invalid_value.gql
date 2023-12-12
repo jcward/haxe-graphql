@@ -2,7 +2,7 @@
 type Foo {
   age: Int
   name: String
-  stars: String
+  stars: S
 }
 
 type Query {
