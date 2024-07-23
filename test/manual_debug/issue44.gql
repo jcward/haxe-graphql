@@ -1,0 +1,59 @@
+
+
+type TaskListModule {
+  content_type: ContentModuleType!
+  tasklist_id: ID!
+}
+
+type PollModule {
+  content_type: ContentModuleType!
+  poll_id: ID!
+}
+
+enum ContentModuleType
+{
+  POLL
+  TASKLIST
+}
+
+union ContentModule = PollModule | TaskListModule
+
+fragment ContentModuleFragment on ContentModule {
+  __typename
+  ...on PollModule {
+    poll_id
+    content_type
+  }
+  ...on TaskListModule {
+    tasklist_id
+    content_type
+  }
+}
+
+type Query
+{
+  content_module_by_id(id: ID!): ContentModule!
+}
+
+query GetContentModuleById($id: ID!) {
+  content_module_by_id(id: $id) {
+    __typename
+    ... on TaskListModule {
+      content_type
+      tasklist_id
+    }
+    ... on PollModule {
+      content_type
+      poll_id
+    }
+  }
+}
+
+query GetContentModuleByIdWithFrag($id: ID!) {
+ content_module_by_id(id: $id) {
+    ...ContentModuleFragment
+  }
+}
+
+
+

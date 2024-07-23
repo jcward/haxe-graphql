@@ -9,6 +9,8 @@
 
 -resource test.gql@injected_gql
 
+-lib hxnodejs
+
 # Test
 -debug
 -cp .

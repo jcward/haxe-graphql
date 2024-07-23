@@ -1011,8 +1011,12 @@ class GQLTypeTools
   private static function generate_union_with_typename(tname:String, type_paths:Array<String>, types_by_name:StringMapAA<GQLTypeDefinition>, writer:StringWriter) {
 
     // Generate the enum definition
+    var enum_val_names= [];
     var enum_vals = type_paths.map(function(type_path) {
-      var name = '${type_path.split("InnerResult_")[1]}';
+      var r = ~/(ON_.*$)/;
+      r.match(type_path);
+      var name = r.matched(1);
+      enum_val_names.push(name);
       return {name:'${name}(v:${type_path});'};
     });
     var union_enum_template_str =
@@ -1027,7 +1031,7 @@ class GQLTypeTools
     // Generate the tname abstract with the as_enum() method
     var paths = [];
     for(i in 0...type_paths.length) {
-      paths.push({index:i, path:type_paths[i], enum_val_name:type_paths[i].split("InnerResult_")[1]});
+      paths.push({index:i, path:type_paths[i], enum_val_name:enum_val_names[i]});
     }
     var as_enum_template_str = ' public function as_enum():::tname::Enum {
       var re = new EReg(this.__typename, "");

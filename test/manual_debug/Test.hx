@@ -1,5 +1,5 @@
 package;
-
+import sys.io.File;
 //import Playground;
 
 class Test
@@ -48,6 +48,7 @@ class Test
     if (result.stderr.length>0) {
       trace('Error:\n${ result.stderr }');
     } else {
+      File.saveContent("GeneratedHaxe.hx", cast result.stdout);
       trace(result.stdout);
     }
     trace('============================================================');
