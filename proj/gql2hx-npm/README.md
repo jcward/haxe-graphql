@@ -22,6 +22,7 @@ Development sponsored by: [www.wootmath.com](https://www.wootmath.com) [simbulus
 Release notes: 
 ---
 
+ 0.0.25 - Parser ignore/allow interface implements other interfaces / issue #48  
  0.0.24 - Added support for Unions via __typename / as_enum() / issue #43  
  0.0.23 - Updated to graphql-js v14.3.0, block string support thanks to github.com/darmie  
  0.0.22 - Improved error reporting / issue #35  

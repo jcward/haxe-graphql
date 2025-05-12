@@ -1,6 +1,5 @@
 # cd proj/webdemo
-# haxe build.hxml
-# ./deploy.sh
+# ./build_and_deploy.sh
 # cd ../gql2hx-npm
 # Update version in package.json and README.md
 # npm run-script build

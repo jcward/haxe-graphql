@@ -13,7 +13,7 @@
 -js out.js
 
 --next
--cmd cat out.js | uglifyjs -m > gql2hx_demo.js
+-cmd cat out.js | npx uglify-js -m > gql2hx_demo.js
 
 --next
 -cmd rm out.js
