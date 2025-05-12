@@ -4,7 +4,10 @@
 # include, aka, no main entry:
 graphql.HaxeGenerator
 
-# Need parser cp for StringSlice
+graphql.parser.Parser
+--macro addGlobalMetadata("graphql.parser.Parser", "@:expose")
+
+# Need parser cp for StringSlice and optional Haxe parsing
 -cp ../parser/src
 
 # AST
