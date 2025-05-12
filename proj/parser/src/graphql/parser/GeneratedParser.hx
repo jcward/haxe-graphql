@@ -971,6 +971,7 @@ private function parseInterfaceTypeDefinition(
   var description = parseDescription(lexer);
   expectKeyword(lexer, 'interface');
   var name = parseName(lexer);
+  var interfaces = parseImplementsInterfaces(lexer); // Re #48 - interfaces can implement interfaces
   var directives = parseDirectives(lexer, true);
   var fields = parseFieldsDefinition(lexer);
   return {
