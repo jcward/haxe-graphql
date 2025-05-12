@@ -22,6 +22,7 @@ class Test
     trace('============================================================');
 
     var gql = haxe.Resource.getString('injected_gql');
+    if (gql==null || gql.length < 5) throw 'No GQL resource found';
     var p = new graphql.parser.Parser(gql, { noLocation:true });
     trace(gql);
     trace(p.document);

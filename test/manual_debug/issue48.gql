@@ -1,0 +1,18 @@
+# Duplication is mandatory. You cannot omit the inherited field list in the child interface.
+interface BazBar implements Foo & Bar {
+  foo: Int
+  bar: Int
+}
+
+interface Foo {
+  foo: Int
+}
+
+interface Bar {
+  bar: Int
+}
+
+# Duplication is mandatory. You cannot omit the inherited field list in the child interface.
+interface Baz implements Foo {
+  foo: Int
+}

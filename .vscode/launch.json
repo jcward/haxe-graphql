@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch via NPM",
+      "name": "Run manual_debug",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}/test/manual_debug",
