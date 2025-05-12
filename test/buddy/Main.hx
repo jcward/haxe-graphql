@@ -44,6 +44,7 @@ class Main {
                              new tests.issues.Issue35(),
                              new tests.issues.Issue43(),
                              new tests.issues.Issue43b(),
+                             new tests.issues.Issue48(),
     ], reporter);
 
     runner.run();
