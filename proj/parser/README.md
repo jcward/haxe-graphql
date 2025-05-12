@@ -9,7 +9,7 @@ are released, depending on the scope of the changes. You can regenerate the lexe
 (from the Facebook .js source code) as follows:
 
 ```
-./gen_lexer.rb src/graphql/parser/GeneratedLexer.hx
+./gen_lexer.rb > src/graphql/parser/GeneratedLexer.hx
 ./gen_parser.rb > src/graphql/parser/GeneratedParser.hx
 ```
 
