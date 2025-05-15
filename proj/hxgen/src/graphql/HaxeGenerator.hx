@@ -294,8 +294,8 @@ class HaxeGenerator
               error('Type $tname implements $iname, but the type of field $field_name doesn\'t match (List vs non-List)');
               continue;
             }
-            if (ifield.is_optional != tfield.is_optional) {
-              error('Type $tname implements $iname, but the type of field $field_name doesn\'t match (nullable vs non-nullable)');
+            if (!ifield.is_optional && tfield.is_optional) {
+              error('Type $tname has optional field $field_name, while interface $iname requires it');
               continue;
             }
 

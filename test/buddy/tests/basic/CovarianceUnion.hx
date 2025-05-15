@@ -91,24 +91,6 @@ type CVPerson implements HasUnionCovariableIdentity {
         err.should.contain("field info");
         err.should.contain("List vs non-List");
       });
-
-
-
-      // CVPerson fail on optionality mismatch
-      it('field relying on covairance should work', {
-        var parser = new graphql.parser.Parser(union_gql+'
-type CVPerson implements HasUnionCovariableIdentity {
-  person_id:ID!
-  name:String!
-  info: License!
-}
-');
-        var err = graphql.HaxeGenerator.parse.bind(parser.document).should.throwType(String);
-        err.should.contain("Type CVPerson implements HasUnionCovariableIdentity");
-        err.should.contain("field info");
-        err.should.contain("nullable vs non-nullable");
-      });
-
     });
   }
 }

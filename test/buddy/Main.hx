@@ -13,6 +13,7 @@ class Main {
                              new tests.basic.BasicTypes(),
                              new tests.basic.BasicErrors(),
                              new tests.basic.BoolTest(),
+                             new tests.basic.Interfaces(),
                              new tests.basic.ValidHaxe(),
                              new tests.basic.Reporting(),
                              new tests.basic.BasicSchema(),
