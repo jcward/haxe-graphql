@@ -22,6 +22,7 @@ Development sponsored by: [www.wootmath.com](https://www.wootmath.com) [simbulus
 Release notes: 
 ---
 
+ 0.0.27 - Allow type to define a field as required, when interface has it as optional  
  0.0.26 - Add cli option -x to use Haxe parser (vs default graphql library)  
  0.0.25 - Parser ignore/allow interface implements other interfaces / issue #48  
  0.0.24 - Added support for Unions via __typename / as_enum() / issue #43  
