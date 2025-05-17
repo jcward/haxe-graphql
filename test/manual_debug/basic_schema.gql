@@ -20,4 +20,5 @@ type Person {
   id:    ID!
   name : String!
   friends: [Person!]
+  digits: [[Int]]
 }

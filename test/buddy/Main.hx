@@ -19,6 +19,7 @@ class Main {
                              new tests.basic.BasicSchema(),
                              new tests.basic.CovarianceUnion(),
                              new tests.basic.CovarianceInterface(),
+                             new tests.basic.NestedArrays(),
                              new tests.args.ArgsDefaultValues(),
                              new tests.args.ArgsBlockString(),
                              new tests.operations.BasicQuery(),

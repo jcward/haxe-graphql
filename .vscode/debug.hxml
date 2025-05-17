@@ -7,7 +7,7 @@
 # AST
 -cp ../../proj/ast/src
 
--resource issue48.gql@injected_gql
+-resource test.gql@injected_gql
 
 -D GQL_PARSER_DEBUG
 

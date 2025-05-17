@@ -356,20 +356,37 @@ class HaxeGenerator
   function parse_field_type(type:ASTDefs.TypeNode, def_name:String):GQLFieldType
   {
     var field_type:GQLFieldType = { type:null, is_array:false, is_optional:false };
+    var array_nesting_level = 0;
 
-    function has_kind(kind:String, type:ASTDefs.TypeNode):Bool {
-      if (type==null) return false;
-      if (type.kind==kind) return true;
+    // Traverse type tree and collect metadata through side effects
+    function traverse_type_tree(kind:String, type:ASTDefs.TypeNode):Void {
+      if (type==null) return;
+
+      // Count array nesting level if we find LIST_TYPE
+      if (type.kind==kind && kind == ASTDefs.Kind.LIST_TYPE) {
+        array_nesting_level++;
+      }
+
+      // Set the base type name when we find a NAMED_TYPE
       if (type.kind==ASTDefs.Kind.NAMED_TYPE) {
         field_type.type = TPath(type.name.value);
         type_referenced(type.name.value);
       }
-      return has_kind(kind, type.type); // recurse
+
+      // Always recurse to process the entire type tree
+      traverse_type_tree(kind, type.type);
     }
 
-    field_type.is_array = has_kind(ASTDefs.Kind.LIST_TYPE, type);
+    // Find array nesting and track the level
+    traverse_type_tree(ASTDefs.Kind.LIST_TYPE, type);
+    field_type.is_array = array_nesting_level > 0;
+    field_type.array_nesting_level = array_nesting_level;
+
+    // Set optionality based on NON_NULL_TYPE
     field_type.is_optional = type.kind!=ASTDefs.Kind.NON_NULL_TYPE;
-    has_kind(' find base ', type);
+
+    // Ensure we've found the base type
+    traverse_type_tree(' find base ', type);
 
     if (field_type.type==null) error('Malformed GQL definition - did not find the named type while parsing definition: ${ def_name }!');
     return field_type;
@@ -506,7 +523,7 @@ class HaxeGenerator
       if (ptr==null) { // select from root types
         ptr = _types_by_name.get(name);
         if (ptr==null) error('${ err_prefix }Didn\'t find root type ${ name } while resolving ${ orig_path }', true);
-        if (path.length==0) return { is_array:false, is_optional:false, type:TPath(name) };
+        if (path.length==0) return { is_array:false, is_optional:false, type:TPath(name), array_nesting_level:0 };
       } else {
         switch ptr {
           case TBasic(tname) | TScalar(tname) | TEnum(tname, _):
@@ -515,7 +532,7 @@ class HaxeGenerator
           var field:GQLFieldType;
           // Issue 43 - support __typename instrinsic
           if(name == '__typename') {
-            field =  { type:TPath('String'), is_array:false, is_optional:true };
+            field =  { type:TPath('String'), is_array:false, is_optional:true, array_nesting_level:0 };
           } else {
             field = fields[name];
           }
@@ -793,7 +810,12 @@ class HaxeGenerator
                 StringTools.replace(type_name, OP_OUTER_SUFFIX, OP_INNER_SUFFIX) : type_name+DEFAULT_SEPARATOR+name;
 
               var sub_type = generate_type_based_on_selection_set(sub_type_name, gt_info, field_node.selectionSet, tname, depth+1);
-              var f = { type:null, is_array:resolved.is_array, is_optional:resolved.is_optional };
+              var f = { 
+                type:null, 
+                is_array:resolved.is_array, 
+                is_optional:resolved.is_optional, 
+                array_nesting_level:resolved.array_nesting_level 
+              };
               fields[alias] = f;
               if (is_union(sub_type_name)) {
                 f.type = TPath(sub_type_name);
@@ -935,7 +957,8 @@ enum GQLTypeRef {
 typedef GQLFieldType = {
   type:GQLTypeRef, // aka, like a TPath(TypePath), or anon definition
   is_array:Bool,
-  is_optional:Bool
+  is_optional:Bool,
+  ?array_nesting_level:Int
 }
 enum GQLTypeDefinition {
   TBasic(name:String);
@@ -960,7 +983,13 @@ class GQLTypeTools
     switch gql_f.type {
       case TPath(name):
         var ct:ComplexType = TPath({ pack:[], name:gql_to_haxe_type_name_transforms(name) });
-        if (gql_f.is_array) ct = TPath({ pack:[], name:'Array', params:[ TPType(ct) ] });
+        // Handle nested arrays by wrapping multiple times
+        if (gql_f.is_array) {
+          var nesting = gql_f.array_nesting_level != null ? gql_f.array_nesting_level : 1;
+          for (i in 0...nesting) {
+            ct = TPath({ pack:[], name:'Array', params:[ TPType(ct) ] });
+          }
+        }
         var field = { name:field_name, kind:FVar(ct, null), meta:[], pos:FAKE_POS };
         if (gql_f.is_optional) field.meta.push({ name:":optional", pos:FAKE_POS });
         return field;
@@ -972,7 +1001,13 @@ class GQLTypeTools
           fields.push(to_haxe_field(fname, inner));
         }
         var ct = TAnonymous(fields);
-        if (gql_f.is_array) ct = TPath({ pack:[], name:'Array', params:[ TPType(ct) ] });
+        // Handle nested arrays by wrapping multiple times
+        if (gql_f.is_array) {
+          var nesting = gql_f.array_nesting_level != null ? gql_f.array_nesting_level : 1;
+          for (i in 0...nesting) {
+            ct = TPath({ pack:[], name:'Array', params:[ TPType(ct) ] });
+          }
+        }
         var field = { name:field_name, kind:FVar(ct, null), meta:[], pos:FAKE_POS };
         if (gql_f.is_optional) field.meta.push({ name:":optional", pos:FAKE_POS });
         return field;
